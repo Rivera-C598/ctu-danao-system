@@ -1,146 +1,86 @@
 /* ============================================
    CTU Room Management System - Instructor Requests
+   API-backed version
    ============================================ */
 
-/**
- * Open request modal for a room
- * @param {number} roomId - Room ID
- */
+function todayLocalString() {
+    const now = new Date();
+    const year = now.getFullYear();
+    const month = String(now.getMonth() + 1).padStart(2, '0');
+    const day = String(now.getDate()).padStart(2, '0');
+    return `${year}-${month}-${day}`;
+}
+
 function openRequestModal(roomId) {
     selectedRoomForRequest = roomId;
     const room = allRooms.find(r => r.id === roomId);
+    if (!room) return alert('Room not found');
+    if (room.isRequestable === false) return alert('This room is currently not available for instructor requests.');
 
     document.getElementById('requestRoomNumber').textContent = `Room ${room.id}`;
     document.getElementById('requestRoomCategory').textContent = room.category;
 
-    const today = new Date().toISOString().split('T')[0];
-    document.getElementById('requestDate').min = today;
-    document.getElementById('requestDate').value = today;
+    const today = todayLocalString();
+    const dateInput = document.getElementById('requestDate');
+    dateInput.min = today;
+    dateInput.max = today;
+    dateInput.value = today;
 
     document.getElementById('requestStartTime').value = '';
     document.getElementById('requestEndTime').value = '';
     document.getElementById('requestPurpose').value = '';
     document.getElementById('conflictWarning').style.display = 'none';
-
     document.getElementById('requestModal').style.display = 'flex';
 }
 
-/**
- * Close request modal
- */
 function closeRequestModal() {
     document.getElementById('requestModal').style.display = 'none';
     selectedRoomForRequest = null;
 }
 
-/**
- * Submit room request
- */
-function submitRequest() {
+async function submitRequest() {
     const session = getSession();
-    if (!session) {
-        alert('Please log in again');
-        return;
-    }
+    if (!session) return alert('Please log in again');
 
-    const requestStatus = document.querySelector('input[name="requestStatus"]:checked').value;
-    console.log('📋 Request Status Selected:', requestStatus);  // DEBUG
-
+    const requestedStatus = document.querySelector('input[name="requestStatus"]:checked').value;
     const date = document.getElementById('requestDate').value;
     const startTime = document.getElementById('requestStartTime').value;
     const endTime = document.getElementById('requestEndTime').value;
     const purpose = document.getElementById('requestPurpose').value.trim();
+    const today = todayLocalString();
 
-    console.log('📅 Request Date:', date);  // DEBUG
-    console.log('⏰ Start Time:', startTime);  // DEBUG
-    console.log('⏰ End Time:', endTime);  // DEBUG
+    if (!date || !startTime || !endTime) return alert('Please fill in all date and time fields');
+    if (date !== today) return alert(`Schedules are only allowed for today (${today}).`);
+    if (startTime >= endTime) return alert('End time must be after start time');
 
-    if (!date || !startTime || !endTime) {
-        alert('Please fill in all date and time fields');
-        return;
-    }
-
-    // Check if selected date is in the past
-    const today = new Date();
-    today.setHours(0, 0, 0, 0);  // Reset to midnight
-    const todayString = today.toISOString().split('T')[0];
-
-    console.log('📆 Today:', todayString);  // DEBUG
-    console.log('🔍 Date comparison:', date, 'vs', todayString, '| Past?', date < todayString);  // DEBUG
-
-    if (date < todayString) {
-        alert('❌ Cannot schedule for past dates.\n\nToday: ' + todayString + '\nYour date: ' + date + '\n\nPlease select today or a future date.');
-        return;
-    }
-
-    if (startTime >= endTime) {
-        alert('End time must be after start time');
-        return;
-    }
-
-    const room = allRooms.find(r => r.id === selectedRoomForRequest);
-
-    if (checkTimeConflict(room, date, startTime, endTime)) {
-        document.getElementById('conflictWarning').style.display = 'flex';
-        return;
-    }
-
-    const request = {
-        id: Date.now(),
-        roomId: selectedRoomForRequest,
-        roomCategory: room.category,
-        instructor: session.username,
-        date: date,
-        startTime: startTime,
-        endTime: endTime,
-        purpose: purpose,
-        requestedStatus: requestStatus,
-        status: 'pending',
-        requestedAt: new Date().toISOString()
-    };
-
-    console.log('📋 Full Request Object:', request);  // DEBUG
-    pendingRequests.push(request);
-    saveToStorage();
-
-    if (typeof notifyRequestAction === 'function') {
-        notifyRequestAction({
-            type: 'new_request',
-            action: 'submitted',
-            user: session.username,
-            roomId: selectedRoomForRequest,
-            instructor: session.username,
-            title: 'New Room Request',
-            message: `${session.username} has submitted a request for Room ${selectedRoomForRequest}`,
-            timestamp: new Date().toISOString()
+    try {
+        const result = await apiFetch('/api/requests', {
+            method: 'POST',
+            body: JSON.stringify({
+                roomId: selectedRoomForRequest,
+                date,
+                startTime,
+                endTime,
+                purpose,
+                requestedStatus
+            })
         });
+        await refreshData({ render: true });
+        alert(result.status === 'active'
+            ? 'Schedule approved automatically. You are active for this room.'
+            : 'Schedule added to standby queue.');
+        closeRequestModal();
+    } catch (error) {
+        alert(error.message);
     }
-
-    addLog(
-        'request',
-        selectedRoomForRequest,
-        session.username,
-        room.category,
-        `Request: ${requestStatus} status for ${date} ${startTime}-${endTime} - ${purpose}`,
-        'Pending'
-    );
-
-    alert('Request submitted successfully! Please wait for admin approval.');
-    closeRequestModal();
-    updateInstructorStats();
 }
 
-/**
- * Render my schedules
- */
 function renderMySchedules() {
     const list = document.getElementById('mySchedulesList');
     const noData = document.getElementById('noMySchedules');
-
     const session = getSession();
-    if (!session) return;
+    if (!session || !list) return;
 
-    // Get all scheduled entries from allRooms where this instructor is scheduled
     const myScheduledItems = [];
     allRooms.forEach(room => {
         if (room.type === 'register' && room.schedules) {
@@ -149,7 +89,7 @@ function renderMySchedules() {
                     myScheduledItems.push({
                         roomId: room.id,
                         roomCategory: room.category,
-                        roomStatus: room.status,  // Include the room status
+                        roomStatus: room.status,
                         ...schedule
                     });
                 }
@@ -157,16 +97,7 @@ function renderMySchedules() {
         }
     });
 
-    // Sort by newest first (descending date, then descending start time)
-    myScheduledItems.sort((a, b) => {
-        const dateA = new Date(a.date);
-        const dateB = new Date(b.date);
-        if (dateA.getTime() !== dateB.getTime()) {
-            return dateB - dateA; // newer dates first
-        }
-        // same date, compare start time descending
-        return b.startTime.localeCompare(a.startTime);
-    });
+    myScheduledItems.sort((a, b) => `${b.date} ${b.startTime}`.localeCompare(`${a.date} ${a.startTime}`));
 
     if (myScheduledItems.length === 0) {
         list.innerHTML = '';
@@ -175,42 +106,46 @@ function renderMySchedules() {
     }
 
     noData.style.display = 'none';
-
     list.innerHTML = myScheduledItems.map(item => `
         <div class="schedule-item">
             <div class="item-header">
                 <span class="item-room">Room ${item.roomId} ${item.roomCategory}</span>
                 <span class="item-status status-${item.queueStatus || 'active'}">
-                    ${item.queueStatus === 'standby' ? '⏳ Standby' : '✓ Active'}
+                    ${item.queueStatus === 'standby' ? 'Standby' : 'Active'}
                 </span>
             </div>
             <div class="item-details">
                 <strong>Date:</strong> ${formatDateShort(item.date)}<br>
                 <strong>Time:</strong> ${item.startTime} - ${item.endTime}<br>
                 <strong>Purpose:</strong> ${item.purpose || 'N/A'}<br>
-                <strong style="color: ${item.roomStatus === 'Locked' ? '#e74c3c' : item.roomStatus === 'Meeting' ? '#9b59b6' : '#f39c12'};">
-                    🔍 Room Status: ${item.roomStatus}
-                </strong><br>
-                ${item.queueStatus === 'standby' ? '<strong style="color: #ff9800;">⏳ Status:</strong> Waiting for previous schedule to end<br>' : ''}
+                <strong>Room Status:</strong> ${item.roomStatus}<br>
+                ${item.queueStatus === 'standby' ? '<strong style="color: #ff9800;">Status:</strong> Waiting for previous schedule to end<br>' : ''}
             </div>
+            ${item.queueStatus === 'active' ? `<button class="btn-submit" onclick="markScheduleDone('${item.id}')">Done</button>` : ''}
         </div>
     `).join('');
 }
 
-/**
- * Render my pending requests
- */
+async function markScheduleDone(scheduleId) {
+    if (!confirm('Mark this room session as done?')) return;
+    try {
+        await apiFetch(`/api/schedules/${scheduleId}/done`, { method: 'POST', body: '{}' });
+        await refreshData({ render: true });
+        alert('Session marked done.');
+    } catch (error) {
+        alert(error.message);
+    }
+}
+
 function renderMyRequests() {
     const list = document.getElementById('pendingRequestsList');
     const noData = document.getElementById('noPendingRequests');
-
     const session = getSession();
-    if (!session) return;
+    if (!session || !list) return;
 
-    const myRequests = pendingRequests.filter(r => r.instructor === session.username);
-
-    // Sort by newest first (descending order by requestedAt)
-    myRequests.sort((a, b) => new Date(b.requestedAt) - new Date(a.requestedAt));
+    const myRequests = pendingRequests
+        .filter(r => r.instructor === session.username)
+        .sort((a, b) => new Date(b.requestedAt) - new Date(a.requestedAt));
 
     if (myRequests.length === 0) {
         list.innerHTML = '';
@@ -219,133 +154,42 @@ function renderMyRequests() {
     }
 
     noData.style.display = 'none';
-
-    list.innerHTML = myRequests.map(request => {
-        const statusClass = request.status === 'approved' ? 'approved' :
-            request.status === 'rejected' ? 'rejected' : 'pending';
-        const statusText = request.status.charAt(0).toUpperCase() + request.status.slice(1);
-
-        return `
-            <div class="request-item">
-                <div class="item-header">
-                    <span class="item-room">Room ${request.roomId} ${request.roomCategory}</span>
-                    <span class="item-status status-${statusClass}">${statusText}</span>
-                </div>
-                <div class="item-details">
-                    <strong>Requested Status:</strong> ${request.requestedStatus || 'N/A'}<br>
-                    <strong>Date:</strong> ${formatDateShort(request.date)}<br>
-                    <strong>Time:</strong> ${request.startTime} - ${request.endTime}<br>
-                    <strong>Purpose:</strong> ${request.purpose || 'N/A'}<br>
-                    <strong>Requested:</strong> ${new Date(request.requestedAt).toLocaleDateString()}
-                </div>
-                <div class="item-actions">
-                    <button class="btn-remove" onclick="removeRequest(${request.id})">
-                        🗑️ Remove Request
-                    </button>
-                </div>
+    list.innerHTML = myRequests.map(request => `
+        <div class="request-item">
+            <div class="item-header">
+                <span class="item-room">Room ${request.roomId} ${request.roomCategory}</span>
+                <span class="item-status status-${request.status}">${request.status}</span>
             </div>
-        `;
-    }).join('');
+            <div class="item-details">
+                <strong>Requested Status:</strong> ${request.requestedStatus || 'N/A'}<br>
+                <strong>Date:</strong> ${formatDateShort(request.date)}<br>
+                <strong>Time:</strong> ${request.startTime} - ${request.endTime}<br>
+                <strong>Purpose:</strong> ${request.purpose || 'N/A'}<br>
+                ${request.queuePosition ? `<strong>Queue:</strong> #${request.queuePosition}<br>` : ''}
+            </div>
+            ${['active', 'standby'].includes(request.status) ? `
+                <div class="item-actions">
+                    <button class="btn-remove" onclick="removeRequest('${request.id}')">Remove Request</button>
+                </div>
+            ` : ''}
+        </div>
+    `).join('');
 }
 
-/**
- * Remove a pending request
- * @param {number} requestId - Request ID to remove
- */
-function removeRequest(requestId) {
+async function removeRequest(requestId) {
     const request = pendingRequests.find(r => r.id === requestId);
-    if (!request) {
-        alert('Request not found');
-        return;
-    }
+    if (!request) return alert('Request not found');
+    if (!confirm(`Remove request for Room ${request.roomId}?`)) return;
 
-    if (!confirm(`Remove request for Room ${request.roomId}?\n\nThis will make the schedule available for others.`)) {
-        return;
-    }
-
-    // If request was approved, remove from room schedules
-    if (request.status === 'approved') {
-        const baseRoom = allRooms.find(r => r.type === 'register' && r.id === request.roomId);
-        if (baseRoom && baseRoom.schedules) {
-            // Find and remove the schedule with this request ID
-            const scheduleIndex = baseRoom.schedules.findIndex(s => s.requestId === request.id);
-            if (scheduleIndex !== -1) {
-                baseRoom.schedules.splice(scheduleIndex, 1);
-
-                // If there are remaining schedules, update the room with the next schedule
-                if (baseRoom.schedules.length > 0) {
-                    baseRoom.date = baseRoom.schedules[0].date;
-                    baseRoom.startTime = baseRoom.schedules[0].startTime;
-                    baseRoom.endTime = baseRoom.schedules[0].endTime;
-                    baseRoom.instructor = baseRoom.schedules[0].instructor;
-                    baseRoom.status = baseRoom.schedules[0].requestedRoomStatus || 'Available';
-
-                    // Update all standby schedules to check if they can move to active
-                    if (baseRoom.schedules[0].queueStatus === 'standby') {
-                        baseRoom.schedules[0].queueStatus = 'active';
-                    }
-
-                    console.log('📅 Room updated with next schedule:', {
-                        roomId: baseRoom.id,
-                        date: baseRoom.date,
-                        instructor: baseRoom.instructor
-                    });
-                } else {
-                    // No more schedules, reset room to available
-                    baseRoom.status = 'Available';
-                    baseRoom.date = null;
-                    baseRoom.startTime = null;
-                    baseRoom.endTime = null;
-                    baseRoom.instructor = null;
-
-                    console.log('🏠 Room reset to available:', { roomId: baseRoom.id });
-                }
-
-                // Update history
-                baseRoom.history = baseRoom.history || [];
-                baseRoom.history.push(
-                    `${new Date().toLocaleTimeString()} - ${request.instructor} removed schedule (${request.date} ${request.startTime}-${request.endTime})`
-                );
-            }
-        }
-    }
-
-    // Remove from pending requests
-    const requestIndex = pendingRequests.findIndex(r => r.id === requestId);
-    if (requestIndex !== -1) {
-        pendingRequests.splice(requestIndex, 1);
-    }
-
-    // Save changes
-    saveToStorage();
-
-    console.log('🗑️ Request removed:', {
-        requestId: requestId,
-        roomId: request.roomId,
-        instructor: request.instructor
-    });
-
-    alert('Request removed successfully. The schedule is now available for others.');
-
-    // Re-render the requests
-    renderMyRequests();
-    updateInstructorStats();
-
-    // Notify about the removal
-    if (typeof notifyRequestAction === 'function') {
-        notifyRequestAction({
-            type: 'request_removed',
-            action: 'removed',
-            user: request.instructor,
-            roomId: request.roomId,
-            title: 'Schedule Removed',
-            message: `${request.instructor} has removed their schedule for Room ${request.roomId}`,
-            timestamp: new Date().toISOString()
-        });
+    try {
+        await apiFetch(`/api/requests/${requestId}`, { method: 'DELETE' });
+        await refreshData({ render: true });
+        alert('Request removed successfully.');
+    } catch (error) {
+        alert(error.message);
     }
 }
 
-// Export for use in other modules
 if (typeof module !== 'undefined' && module.exports) {
     module.exports = {
         openRequestModal,
@@ -353,6 +197,7 @@ if (typeof module !== 'undefined' && module.exports) {
         submitRequest,
         renderMySchedules,
         renderMyRequests,
-        removeRequest
+        removeRequest,
+        markScheduleDone
     };
 }

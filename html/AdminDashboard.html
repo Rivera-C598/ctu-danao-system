@@ -449,6 +449,14 @@
                     </div>
                 </div>
 
+                <div class="database-table-wrapper" style="margin-bottom: 20px; padding: 16px;">
+                    <div style="display: flex; justify-content: space-between; align-items: center; gap: 12px; margin-bottom: 12px;">
+                        <h3 style="margin: 0;">Registration Codes</h3>
+                        <button class="btn-export" onclick="createRegistrationCode()">Generate Code</button>
+                    </div>
+                    <div id="registrationCodesList"></div>
+                </div>
+
                 <div class="database-table-wrapper">
                     <table id="databaseTable">
                         <thead>
@@ -476,8 +484,6 @@
 
     <!-- JavaScript Files - FIXED PATHS -->
     <!-- Socket.io for real-time sync -->
-    <script src="https://cdn.socket.io/4.7.2/socket.io.min.js"></script>
-
     <!-- Utility & Auth Scripts -->
     <script src="/js/utils/storage.js"></script>
     <script src="/js/utils/auth-guard.js"></script>
@@ -493,8 +499,8 @@
     <script src="/js/admin/roomManager.js"></script>
 
     <script>
-        // Initialize Socket.io for real-time synchronization
-        const socket = io();
+        // Realtime sync was replaced by API polling.
+        const socket = { on: function () {} };
 
         socket.on('connect', () => {
             console.log('✅ Connected to server for real-time sync');
@@ -521,6 +527,7 @@
                 return;
             }
 
+            initSync();
             initAdminView();
 
             // Request notification permission

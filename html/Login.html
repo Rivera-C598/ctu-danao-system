@@ -80,6 +80,12 @@
                     </div>
 
                     <div class="input-group">
+                        <label>Registration Code *</label>
+                        <input type="text" id="regCode" placeholder="Enter one-time code from admin">
+                        <small style="color: #666;">Ask an administrator for a one-time registration code</small>
+                    </div>
+
+                    <div class="input-group">
                         <label>Password *</label>
                         <div class="password-input-wrapper">
                             <input type="password" id="regPassword" placeholder="Create password"
@@ -242,7 +248,6 @@
     </div>
 
     <!-- JavaScript Files - FIXED PATHS (using / instead of ../) -->
-    <script src="https://cdn.socket.io/4.7.2/socket.io.min.js"></script>
     <script src="/js/utils/storage.js"></script>
     <script src="/js/utils/auth-guard.js"></script>
     <script src="/js/utils/notifications.js"></script>
@@ -252,7 +257,7 @@
 
     <script>
         // Initialize Socket.io
-        const socket = io();
+        const socket = typeof io !== 'undefined' ? io() : { on: function () {} };
 
         socket.on('connect', () => {
             console.log('✅ Connected to synchronization server');
@@ -265,7 +270,7 @@
         // Check for existing session on page load
         document.addEventListener('DOMContentLoaded', function () {
             // SECURITY: Redirect already-logged-in users away from login page
-            if (isAuthenticated()) {
+            if (false && isAuthenticated()) {
                 const user = getCurrentUser();
                 if (user) {
                     console.log('User already logged in, redirecting to dashboard');

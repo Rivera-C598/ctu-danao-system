@@ -66,7 +66,7 @@ function clearLoginForm() {
 /**
  * Perform login
  */
-function performLogin() {
+async function performLogin() {
     const username = document.getElementById('loginUsername').value.trim().toLowerCase();
     const password = document.getElementById('loginPassword').value;
     const errorDiv = document.getElementById('loginError');
@@ -81,68 +81,47 @@ function performLogin() {
         return;
     }
 
-    // Find user in database
-    const user = usersDatabase.find(u => u.username.toLowerCase() === username);
-
-    if (!user) {
-        errorDiv.innerHTML = `Account not found. <a href="#" onclick="switchToRegister(); document.getElementById('regUsername').value='${username}'; return false;">Create new account?</a>`;
-        return;
-    }
-
-    if (user.password !== password) {
-        errorDiv.innerHTML = `Incorrect password. Please try again. <a href="#" onclick="switchToRecovery('${username}'); return false;" class="forget-password-link">Forget Password?</a>`;
-        return;
-    }
-
-    // Successful login - update user stats
-    user.lastLogin = new Date().toISOString();
-    user.loginCount++;
-    const isNewAccount = user.isNewAccount;
-    user.isNewAccount = false;
-    saveUsersDatabase();
-
-    // Set current session based on user's role
-    currentUser = username;
-    currentRole = user.role;
-
-    // Store session and authentication
-    saveSession({
-        username,
-        role: user.role,
-        fullName: user.fullName,
-        isNewAccount: isNewAccount
-    });
-
-    // SECURITY: Store authenticated user in localStorage for auth-guard
-    if (typeof setCurrentUser === 'function') {
-        setCurrentUser({
-            username: username,
-            fullName: user.fullName,
-            role: user.role,
-            email: user.email,
-            loginTime: new Date().toISOString()
+    try {
+        const result = await apiFetch('/api/auth/login', {
+            method: 'POST',
+            body: JSON.stringify({ username, password })
         });
+        const user = result.user;
+        currentUser = user.username;
+        currentRole = user.role;
+        saveSession({
+            username: user.username,
+            role: user.role,
+            fullName: user.fullName
+        });
+        if (typeof setCurrentUser === 'function') {
+            setCurrentUser({
+                username: user.username,
+                fullName: user.fullName,
+                role: user.role,
+                email: user.email,
+                loginTime: new Date().toISOString()
+            });
+        }
+        document.getElementById('loginView').style.display = 'none';
+        window.location.href = user.role === 'admin' ? '/html/AdminDashboard.html' : '/html/InstructorDashboard.html';
+    } catch (error) {
+        errorDiv.textContent = error.message;
     }
-
-    // Show appropriate view and redirect based on user's role
-    document.getElementById('loginView').style.display = 'none';
-
-    if (user.role === 'instructor') {
-        window.location.href = '/html/InstructorDashboard.html';
-    } else {
-        window.location.href = '/html/AdminDashboard.html';
-    }
-
-    errorDiv.textContent = '';
 }
 
 /**
  * Logout user
  */
-function logout() {
+async function logout() {
     currentUser = null;
     currentRole = null;
     clearSession();
+    try {
+        await apiFetch('/api/auth/logout', { method: 'POST', body: '{}' });
+    } catch (_error) {
+        // Local logout should still continue if the network is unavailable.
+    }
 
     // SECURITY: Clear authentication from localStorage
     if (typeof clearAuthentication === 'function') {
@@ -155,8 +134,20 @@ function logout() {
 /**
  * Check for existing session on page load
  */
-function checkExistingSession() {
-    const session = getSession();
+async function checkExistingSession() {
+    let session = getSession();
+    try {
+        const result = await apiFetch('/api/auth/me');
+        session = {
+            username: result.user.username,
+            role: result.user.role,
+            fullName: result.user.fullName
+        };
+        saveSession(session);
+        if (typeof setCurrentUser === 'function') setCurrentUser(result.user);
+    } catch (_error) {
+        session = null;
+    }
     if (session) {
         const { username, role, fullName } = session;
         currentUser = username;

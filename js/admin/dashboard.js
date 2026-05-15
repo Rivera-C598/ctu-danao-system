@@ -197,6 +197,7 @@ function renderTable() {
             </td>
             <td>
                 ${hasSchedules && room.schedules[0] && room.schedules[0].queueStatus === 'active' ? `<button class="btn-complete" onclick="openCompleteSessionModal(${index})" title="Mark session as complete and activate next schedule">✓ Complete</button>` : ''}
+                <button class="btn-remove" onclick="toggleRoomRequestable(${room.id}, ${room.isRequestable === false ? 'true' : 'false'})">${room.isRequestable === false ? 'Allow Requests' : 'Restrict Requests'}</button>
                 <button class="btn-remove" onclick="removeRoom(${index})">Remove</button>
             </td>
         </tr>`;
@@ -966,4 +967,193 @@ if (typeof module !== 'undefined' && module.exports) {
         removeNextSchedule,
         completeFinalSession
     };
+}
+
+// API-mode overrides. These replace legacy full-state mutations declared above.
+async function updateData(index, field, value) {
+    const room = allRooms[index];
+    if (!room) return;
+    if (field === 'id' || field === 'instructor' || field === 'date' || field === 'startTime' || field === 'endTime') {
+        alert('Direct schedule/room-number edits are disabled in database mode. Use requests or recreate the room.');
+        await refreshData({ render: true });
+        return;
+    }
+    try {
+        await apiFetch(`/api/rooms/${room.id}`, {
+            method: 'PATCH',
+            body: JSON.stringify({ [field]: value })
+        });
+        await refreshData({ render: true });
+    } catch (error) {
+        alert(error.message);
+        await refreshData({ render: true });
+    }
+}
+
+async function changeStatus(index, newStatus) {
+    const room = allRooms[index];
+    if (!room) return;
+    try {
+        await apiFetch(`/api/rooms/${room.id}`, {
+            method: 'PATCH',
+            body: JSON.stringify({ status: newStatus })
+        });
+        await refreshData({ render: true });
+    } catch (error) {
+        alert(error.message);
+    }
+}
+
+async function toggleRoomRequestable(roomNumber, isRequestable) {
+    try {
+        await apiFetch(`/api/rooms/${roomNumber}`, {
+            method: 'PATCH',
+            body: JSON.stringify({ isRequestable })
+        });
+        await refreshData({ render: true });
+    } catch (error) {
+        alert(error.message);
+    }
+}
+
+async function resetSchedule(index) {
+    const room = allRooms[index];
+    if (!room) return;
+    if (!confirm(`Cancel active/standby schedules for Room ${room.id}?`)) return;
+    try {
+        for (const schedule of room.schedules || []) {
+            if (schedule.requestId) {
+                await apiFetch(`/api/requests/${schedule.requestId}`, { method: 'DELETE' });
+            }
+        }
+        await apiFetch(`/api/rooms/${room.id}`, {
+            method: 'PATCH',
+            body: JSON.stringify({ status: 'Available' })
+        });
+        await refreshData({ render: true });
+    } catch (error) {
+        alert(error.message);
+    }
+}
+
+function clearRoomSchedules(index) {
+    resetSchedule(index);
+}
+
+async function removeRoom(index) {
+    const room = allRooms[index];
+    if (!room || !confirm('Remove this room?')) return;
+    try {
+        await apiFetch(`/api/rooms/${room.id}`, { method: 'DELETE' });
+        await refreshData({ render: true });
+    } catch (error) {
+        alert(error.message);
+    }
+}
+
+async function completeCurrentSession(index) {
+    const room = allRooms[index];
+    const active = room?.schedules?.find(schedule => schedule.queueStatus === 'active') || room?.schedules?.[0];
+    if (!active) return alert('No active schedule found');
+    try {
+        await apiFetch(`/api/schedules/${active.id}/done`, { method: 'POST', body: '{}' });
+        await refreshData({ render: true });
+        closeCompleteSessionModal();
+        alert('Session completed.');
+    } catch (error) {
+        alert(error.message);
+    }
+}
+
+function activateNextSchedule(index) {
+    completeCurrentSession(index);
+}
+
+async function removeNextSchedule(index) {
+    const room = allRooms[index];
+    const next = room?.schedules?.find(schedule => schedule.queueStatus === 'standby') || room?.schedules?.[1];
+    if (!next || !next.requestId) return alert('No next schedule available to remove');
+    if (!confirm('Remove the next instructor schedule?')) return;
+    try {
+        await apiFetch(`/api/requests/${next.requestId}`, { method: 'DELETE' });
+        await refreshData({ render: true });
+        closeCompleteSessionModal();
+    } catch (error) {
+        alert(error.message);
+    }
+}
+
+function completeFinalSession(index) {
+    completeCurrentSession(index);
+}
+
+async function createRegistrationCode() {
+    try {
+        const result = await apiFetch('/api/registration-codes', {
+            method: 'POST',
+            body: '{}'
+        });
+        await refreshData({ render: true });
+        alert(`Registration code created: ${result.code}`);
+    } catch (error) {
+        alert(error.message);
+    }
+}
+
+async function revokeRegistrationCode(id) {
+    if (!confirm('Revoke this registration code?')) return;
+    try {
+        await apiFetch(`/api/registration-codes/${id}`, { method: 'DELETE' });
+        await refreshData({ render: true });
+    } catch (error) {
+        alert(error.message);
+    }
+}
+
+function renderRegistrationCodes() {
+    const container = document.getElementById('registrationCodesList');
+    if (!container) return;
+    container.innerHTML = registrationCodes.length === 0
+        ? '<p style="color:#777;">No registration codes yet.</p>'
+        : registrationCodes.map(code => `
+            <div style="display:flex; justify-content:space-between; gap:10px; padding:8px 0; border-bottom:1px solid #eee;">
+                <div>
+                    <strong>${code.code}</strong><br>
+                    <small>${code.usedAt ? `Used by ${code.usedBy || 'unknown'}` : code.revokedAt ? 'Revoked' : 'Unused'}</small>
+                </div>
+                ${!code.usedAt && !code.revokedAt ? `<button class="btn-remove" onclick="revokeRegistrationCode('${code.id}')">Revoke</button>` : ''}
+            </div>
+        `).join('');
+}
+
+async function createAdminAccount() {
+    const username = document.getElementById('adminUsername').value.trim().toLowerCase();
+    const fullName = document.getElementById('adminFullName').value.trim();
+    const email = document.getElementById('adminEmail').value.trim();
+    const password = document.getElementById('adminPassword').value;
+    const confirmPassword = document.getElementById('adminConfirmPassword').value;
+    const messageEl = document.getElementById('adminCreateMessage');
+
+    if (!username || username.length < 3 || !fullName || password.length < 6 || password !== confirmPassword) {
+        messageEl.textContent = 'Please complete the form and make sure passwords match.';
+        messageEl.style.color = '#d32f2f';
+        messageEl.style.display = 'block';
+        return;
+    }
+
+    try {
+        await apiFetch('/api/admin/users', {
+            method: 'POST',
+            body: JSON.stringify({ username, fullName, email: email || null, password, role: 'admin' })
+        });
+        await refreshData({ render: true });
+        messageEl.textContent = 'Admin account created successfully.';
+        messageEl.style.color = '#4caf50';
+        messageEl.style.display = 'block';
+        setTimeout(closeCreateAdminModal, 1000);
+    } catch (error) {
+        messageEl.textContent = error.message;
+        messageEl.style.color = '#d32f2f';
+        messageEl.style.display = 'block';
+    }
 }

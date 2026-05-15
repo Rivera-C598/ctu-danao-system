@@ -238,9 +238,6 @@
     </div>
 
     <!-- JavaScript Files -->
-    <script src="../js/utils/storage.js"></script>
-    <script src="../js/utils/helpers.js"></script>
-    <script src="https://cdn.socket.io/4.7.2/socket.io.min.js"></script>
     <script src="/js/utils/storage.js"></script>
     <script src="/js/utils/auth-guard.js"></script>
     <script src="/js/utils/notifications.js"></script>
@@ -250,8 +247,8 @@
     <script src="/js/instructor/requests.js"></script>
     <script src="/js/utils/mobile-helper.js"></script>
     <script>
-        // Initialize Socket.io for real-time synchronization
-        const socket = io();
+        // Realtime sync was replaced by API polling.
+        const socket = { on: function () {} };
 
         socket.on('connect', () => {
             console.log('✅ Connected to server for real-time sync');
@@ -278,6 +275,7 @@
                 return;
             }
 
+            initSync();
             initInstructorView();
 
             // Request notification permission
