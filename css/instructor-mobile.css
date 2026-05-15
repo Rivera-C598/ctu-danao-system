@@ -1,0 +1,1272 @@
+/* ============================================
+   INSTRUCTOR DASHBOARD - MOBILE RESPONSIVE CSS
+   Mobile-first approach for CP/Mobile devices
+   ============================================ */
+
+/* CSS Variables - Updated to match Admin Theme */
+:root {
+    --primary: #c0392b;
+    --primary-dark: #a93226;
+    --secondary: #7f8c8d;
+    --success: #27ae60;
+    --warning: #f39c12;
+    --danger: #e74c3c;
+    --info: #3498db;
+
+    --bg-primary: #ffffff;
+    --bg-secondary: #f8f9fa;
+    --bg-dark: #2c3e50;
+
+    --text-primary: #2c3e50;
+    --text-secondary: #7f8c8d;
+    --text-light: #bdc3c7;
+
+    --shadow-sm: 0 2px 4px rgba(0, 0, 0, 0.1);
+    --shadow-md: 0 4px 8px rgba(0, 0, 0, 0.15);
+    --shadow-lg: 0 8px 16px rgba(0, 0, 0, 0.2);
+
+    --radius-sm: 4px;
+    --radius-md: 8px;
+    --radius-lg: 12px;
+    --radius-xl: 16px;
+
+    --transition: all 0.3s ease;
+}
+
+/* ============================================
+   MOBILE-FIRST BASE STYLES (320px+)
+   ============================================ */
+
+* {
+    margin: 0;
+    padding: 0;
+    box-sizing: border-box;
+}
+
+body {
+    font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;
+    background: var(--bg-secondary);
+    color: var(--text-primary);
+    line-height: 1.5;
+    -webkit-font-smoothing: antialiased;
+    -webkit-tap-highlight-color: transparent;
+}
+
+/* Dashboard Wrapper - Mobile: Single column */
+.dashboard-wrapper {
+    display: flex;
+    flex-direction: column;
+    min-height: 100vh;
+}
+
+/* ============================================
+   MOBILE TOP HEADER
+   ============================================ */
+
+.mobile-top-header {
+    display: flex;
+    flex-direction: column;
+    gap: 0;
+    padding: 0;
+    background: var(--primary);
+    color: white;
+    position: sticky;
+    top: 0;
+    z-index: 100;
+    box-shadow: var(--shadow-md);
+}
+
+.mobile-header-top {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 12px 16px;
+    gap: 12px;
+}
+
+.mobile-profile-section {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    flex-shrink: 0;
+}
+
+.mobile-profile-avatar {
+    width: 36px;
+    height: 36px;
+    border-radius: 50%;
+    background: rgba(255, 255, 255, 0.2);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 16px;
+    cursor: pointer;
+    transition: var(--transition);
+}
+
+.mobile-profile-avatar:hover {
+    background: rgba(255, 255, 255, 0.3);
+    transform: scale(1.05);
+}
+
+.mobile-profile-name {
+    font-size: 14px;
+    font-weight: 600;
+    max-width: 120px;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+.mobile-controls {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    flex-shrink: 0;
+    margin-left: auto;
+}
+
+.mobile-room-filter {
+    background: rgba(255, 255, 255, 0.1);
+    border: 1px solid rgba(255, 255, 255, 0.2);
+    color: white;
+    padding: 6px 10px;
+    border-radius: var(--radius-md);
+    font-size: 12px;
+    cursor: pointer;
+    outline: none;
+    min-width: 100px;
+}
+
+.mobile-room-filter option {
+    background: var(--bg-dark);
+    color: white;
+}
+
+.mobile-notifications {
+    position: relative;
+    cursor: pointer;
+    padding: 10px;
+    border-radius: 50%;
+    transition: var(--transition);
+    background: rgba(255, 255, 255, 0.2);
+    border: 1px solid rgba(0, 0, 0, 0.08);
+}
+
+.mobile-notifications:hover {
+    background: rgba(255, 255, 255, 0.35);
+}
+
+.notification-icon {
+    font-size: 18px;
+    color: #1a1a1a;
+}
+
+.notification-badge {
+    position: absolute;
+    top: 4px;
+    right: 4px;
+    background: var(--danger);
+    color: white;
+    font-size: 10px;
+    padding: 2px 6px;
+    border-radius: 10px;
+    min-width: 16px;
+    text-align: center;
+    font-weight: bold;
+    box-shadow: 0 1px 4px rgba(0, 0, 0, 0.15);
+}
+
+/* ============================================
+   MOBILE BOTTOM NAVIGATION
+   ============================================ */
+
+.mobile-bottom-nav {
+    display: flex;
+    justify-content: space-around;
+    align-items: center;
+    background: white;
+    border-top: 1px solid #e2e8f0;
+    padding: 8px 0;
+    position: fixed;
+    bottom: 0;
+    left: 0;
+    right: 0;
+    z-index: 100;
+    box-shadow: 0 -2px 10px rgba(0, 0, 0, 0.1);
+}
+
+.nav-btn {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    padding: 8px;
+    background: none;
+    border: none;
+    color: var(--text-secondary);
+    font-size: 10px;
+    cursor: pointer;
+    transition: var(--transition);
+    flex: 1;
+    min-height: 50px;
+    position: relative;
+}
+
+.nav-btn .nav-icon {
+    font-size: 16px;
+    margin-bottom: 2px;
+}
+
+.nav-btn .nav-text {
+    font-size: 10px;
+    font-weight: 500;
+}
+
+.nav-btn.active {
+    color: var(--primary);
+}
+
+.nav-btn.active .nav-icon {
+    transform: scale(1.1);
+}
+
+.nav-badge {
+    position: absolute;
+    top: 4px;
+    right: 20%;
+    background: var(--danger);
+    color: white;
+    font-size: 8px;
+    padding: 1px 4px;
+    border-radius: 8px;
+    min-width: 14px;
+    text-align: center;
+    font-weight: bold;
+}
+
+/* Hide desktop sidebar on mobile */
+.desktop-only {
+    display: none !important;
+}
+
+/* ============================================
+   MAIN CONTENT - MOBILE STYLES
+   ============================================ */
+
+.main-content {
+    flex: 1;
+    padding: 16px;
+    padding-bottom: 80px;
+    /* Space for bottom nav */
+    overflow-y: auto;
+    background: var(--bg-secondary);
+}
+
+.container {
+    max-width: 100%;
+}
+
+/* Remove old system time and header styles for mobile */
+.system-time,
+header {
+    display: none;
+}
+
+/* Search Box - Hidden on mobile for new design */
+.search-box {
+    display: none;
+}
+
+/* Category Filters - Hidden on mobile for new design */
+.category-filters {
+    display: none;
+}
+
+/* ============================================
+   ROOMS GRID - MOBILE CARDS
+   ============================================ */
+
+.rooms-grid {
+    display: grid;
+    grid-template-columns: 1fr;
+    gap: 12px;
+}
+
+/* Room Card - Mobile Optimized - Admin Theme */
+.room-card {
+    background: white;
+    border-radius: var(--radius-lg);
+    padding: 16px;
+    box-shadow: var(--shadow-sm);
+    transition: var(--transition);
+    border: 2px solid transparent;
+    position: relative;
+}
+
+.room-card:active {
+    transform: scale(0.98);
+    border-color: var(--primary);
+}
+
+.room-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 12px;
+}
+
+.room-number {
+    font-size: 16px;
+    font-weight: bold;
+    color: var(--text-primary);
+}
+
+.room-category {
+    font-size: 12px;
+    padding: 4px 8px;
+    background: var(--bg-secondary);
+    color: var(--text-secondary);
+    border-radius: var(--radius-md);
+    font-weight: 500;
+}
+
+.room-status {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    font-size: 12px;
+    font-weight: 600;
+    margin-bottom: 12px;
+}
+
+.status-dot {
+    width: 8px;
+    height: 8px;
+    border-radius: 50%;
+}
+
+.status-available {
+    color: var(--success);
+}
+
+.status-available .status-dot {
+    background: var(--success);
+}
+
+.status-locked {
+    color: var(--danger);
+}
+
+.status-locked .status-dot {
+    background: var(--danger);
+}
+
+.status-meeting {
+    color: var(--warning);
+}
+
+.status-meeting .status-dot {
+    background: var(--warning);
+}
+
+.status-maintenance {
+    color: var(--secondary);
+}
+
+.status-maintenance .status-dot {
+    background: var(--secondary);
+}
+
+.room-schedule {
+    font-size: 12px;
+    color: var(--text-secondary);
+    margin-bottom: 12px;
+    padding: 8px;
+    background: var(--bg-secondary);
+    border-radius: var(--radius-md);
+}
+
+.room-actions {
+    display: flex;
+    gap: 8px;
+}
+
+.btn-request,
+.btn-view-schedule {
+    flex: 1;
+    padding: 10px;
+    border: none;
+    border-radius: var(--radius-md);
+    font-size: 12px;
+    font-weight: 600;
+    cursor: pointer;
+    transition: var(--transition);
+    text-align: center;
+}
+
+.btn-request {
+    background: var(--primary);
+    color: white;
+}
+
+.btn-request:active {
+    background: var(--primary-dark);
+    transform: scale(0.98);
+}
+
+.btn-view-schedule {
+    background: var(--bg-secondary);
+    color: var(--text-secondary);
+    border: 1px solid #e2e8f0;
+}
+
+.btn-view-schedule:active {
+    background: #e2e8f0;
+}
+
+/* ============================================
+   SCHEDULES & REQUESTS LISTS - MOBILE
+   ============================================ */
+
+.schedules-list,
+.requests-list {
+    display: flex;
+    flex-direction: column;
+    gap: 12px;
+    text-align: left;
+}
+
+.schedule-item,
+.request-item {
+    background: white;
+    border-radius: var(--radius-lg);
+    padding: 16px;
+    box-shadow: var(--shadow-sm);
+    border-left: 4px solid var(--primary);
+    text-align: left;
+}
+
+.item-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 12px;
+}
+
+.item-room {
+    font-size: 14px;
+    font-weight: bold;
+    color: var(--text-primary);
+    flex: 1;
+}
+
+.item-status {
+    font-size: 11px;
+    padding: 4px 8px;
+    border-radius: var(--radius-md);
+    font-weight: 600;
+    white-space: nowrap;
+}
+
+.status-approved {
+    background: rgba(39, 174, 96, 0.1);
+    color: var(--success);
+}
+
+.status-pending {
+    background: rgba(243, 156, 18, 0.1);
+    color: var(--warning);
+}
+
+.status-rejected {
+    background: rgba(231, 76, 60, 0.1);
+    color: var(--danger);
+}
+
+.item-details {
+    font-size: 12px;
+    color: var(--text-secondary);
+    line-height: 1.6;
+    text-align: left;
+}
+
+.item-details strong {
+    color: var(--text-primary);
+}
+
+/* ============================================
+   MODAL - MOBILE OPTIMIZED
+   ============================================ */
+
+.modal {
+    position: fixed;
+    top: 0;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    background: rgba(0, 0, 0, 0.5);
+    display: flex;
+    align-items: flex-end;
+    justify-content: center;
+    z-index: 2000;
+    padding: 0;
+}
+
+.modal-content {
+    background: white;
+    width: 100%;
+    max-width: 100%;
+    border-radius: var(--radius-lg) var(--radius-lg) 0 0;
+    max-height: 90vh;
+    overflow-y: auto;
+    animation: slideUp 0.3s ease;
+}
+
+@keyframes slideUp {
+    from {
+        transform: translateY(100%);
+    }
+
+    to {
+        transform: translateY(0);
+    }
+}
+
+.modal-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 16px;
+    border-bottom: 1px solid #e2e8f0;
+    position: sticky;
+    top: 0;
+    background: white;
+    z-index: 10;
+}
+
+.modal-header h3 {
+    font-size: 14px;
+    color: #000;
+    margin: 0;
+}
+
+.btn-close {
+    background: none;
+    border: none;
+    font-size: 24px;
+    color: var(--text-secondary);
+    cursor: pointer;
+    padding: 0;
+    line-height: 1;
+}
+
+.modal-body {
+    padding: 16px;
+}
+
+.room-preview {
+    text-align: center;
+    padding: 12px;
+    background: var(--bg-secondary);
+    border-radius: var(--radius-md);
+    margin-bottom: 16px;
+}
+
+.room-preview .room-number {
+    display: block;
+    font-size: 18px;
+    font-weight: bold;
+    margin-bottom: 4px;
+}
+
+.room-preview .room-category {
+    display: inline-block;
+    font-size: 11px;
+}
+
+.form-group {
+    margin-bottom: 16px;
+}
+
+.form-group label {
+    display: block;
+    font-size: 12px;
+    font-weight: 600;
+    color: var(--text-primary);
+    margin-bottom: 6px;
+}
+
+.form-group input,
+.form-group textarea {
+    width: 100%;
+    padding: 10px;
+    border: 2px solid #e2e8f0;
+    border-radius: var(--radius-md);
+    font-size: 14px;
+    font-family: inherit;
+    transition: var(--transition);
+}
+
+.form-group input:focus,
+.form-group textarea:focus {
+    outline: none;
+    border-color: var(--primary);
+    box-shadow: 0 0 0 3px rgba(192, 57, 43, 0.1);
+}
+
+.request-type-options,
+.form-row {
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+}
+
+@media (min-width: 768px) {
+    .form-row {
+        flex-direction: row;
+        grid-template-columns: 1fr 1fr;
+    }
+}
+
+.radio-label {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    padding: 10px;
+    background: var(--bg-secondary);
+    border-radius: var(--radius-md);
+    cursor: pointer;
+    transition: var(--transition);
+}
+
+.radio-label:hover {
+    background: #e2e8f0;
+}
+
+.radio-label input[type="radio"] {
+    cursor: pointer;
+}
+
+.radio-label input[type="radio"]:checked+.radio-text {
+    color: var(--primary);
+    font-weight: 600;
+}
+
+.radio-text {
+    font-size: 12px;
+    color: var(--text-secondary);
+}
+
+.conflict-warning {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    padding: 10px;
+    background: rgba(231, 76, 60, 0.1);
+    color: var(--danger);
+    border-radius: var(--radius-md);
+    font-size: 12px;
+    font-weight: 500;
+    margin-top: 8px;
+}
+
+.modal-footer {
+    display: flex;
+    gap: 8px;
+    padding: 16px;
+    border-top: 1px solid #e2e8f0;
+    position: sticky;
+    bottom: 0;
+    background: white;
+}
+
+.btn-cancel,
+.btn-submit {
+    flex: 1;
+    padding: 10px;
+    border-radius: var(--radius-md);
+    font-size: 14px;
+    font-weight: 600;
+    cursor: pointer;
+    transition: var(--transition);
+    border: none;
+}
+
+.btn-cancel {
+    background: var(--bg-secondary);
+    color: var(--text-secondary);
+}
+
+.btn-submit {
+    background: var(--primary);
+    color: white;
+}
+
+.btn-submit:active {
+    background: var(--primary-dark);
+    transform: scale(0.98);
+}
+
+/* ============================================
+   NO DATA MESSAGE
+   ============================================ */
+
+.no-data-message {
+    text-align: center;
+    padding: 3rem 1rem;
+    color: var(--text-secondary);
+}
+
+.no-data-message p {
+    font-size: 1rem;
+    margin-bottom: 0.5rem;
+}
+
+/* ============================================
+   TABLET BREAKPOINT (768px+)
+   ============================================ */
+
+@media (min-width: 768px) {
+
+    /* Hide mobile elements on tablet+ */
+    .mobile-top-header,
+    .mobile-bottom-nav {
+        display: none !important;
+    }
+
+    /* Show desktop sidebar */
+    .desktop-only {
+        display: block !important;
+    }
+
+    .dashboard-wrapper {
+        flex-direction: row;
+    }
+
+    .sidebar {
+        position: static;
+        width: 260px;
+        max-height: 100vh;
+        order: 1;
+        padding: 1.5rem;
+        overflow-y: auto;
+    }
+
+    .sidebar-header-box {
+        display: block;
+        margin-bottom: 1.5rem;
+        padding-bottom: 1rem;
+        border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+    }
+
+    .sidebar-header-box h3 {
+        font-size: 1rem;
+        font-weight: 600;
+    }
+
+    .profile-section {
+        display: flex;
+        align-items: center;
+        gap: 0.75rem;
+        margin-bottom: 1.5rem;
+        padding: 1rem;
+        background: rgba(255, 255, 255, 0.05);
+        border-radius: var(--radius-lg);
+    }
+
+    .profile-avatar {
+        width: 45px;
+        height: 45px;
+        border-radius: 50%;
+        background: var(--primary);
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        font-size: 1.5rem;
+    }
+
+    .profile-info {
+        display: flex;
+        flex-direction: column;
+    }
+
+    .profile-name {
+        font-size: 0.9rem;
+        font-weight: 600;
+    }
+
+    .profile-role {
+        font-size: 0.75rem;
+        color: var(--text-light);
+    }
+
+    .instructor-menu {
+        flex-direction: column;
+        gap: 0.5rem;
+        margin-bottom: 1.5rem;
+    }
+
+    .menu-btn {
+        flex-direction: row;
+        justify-content: flex-start;
+        gap: 0.75rem;
+        padding: 0.875rem 1rem;
+        font-size: 0.9rem;
+        border-radius: var(--radius-lg);
+    }
+
+    .menu-btn span:first-child {
+        font-size: 1.2rem;
+        margin-bottom: 0;
+    }
+
+    .menu-btn .badge {
+        position: static;
+        margin-left: auto;
+    }
+
+    .instructor-stats {
+        display: grid;
+        grid-template-columns: 1fr 1fr;
+        gap: 0.75rem;
+        margin-bottom: 1.5rem;
+    }
+
+    .stat-box {
+        background: rgba(255, 255, 255, 0.05);
+        padding: 1rem;
+        border-radius: var(--radius-lg);
+        text-align: center;
+    }
+
+    .stat-number {
+        display: block;
+        font-size: 1.5rem;
+        font-weight: bold;
+        color: var(--primary);
+        margin-bottom: 0.25rem;
+    }
+
+    .stat-label {
+        font-size: 0.75rem;
+        color: var(--text-light);
+    }
+
+    .btn-logout {
+        display: block;
+        width: 100%;
+        padding: 0.875rem;
+        background: rgba(239, 68, 68, 0.1);
+        color: var(--danger);
+        border: 1px solid var(--danger);
+        border-radius: var(--radius-lg);
+        font-size: 0.9rem;
+        font-weight: 600;
+        cursor: pointer;
+        transition: var(--transition);
+    }
+
+    .main-content {
+        order: 2;
+        padding: 2rem;
+        padding-bottom: 2rem;
+    }
+
+    /* Show desktop elements */
+    .system-time,
+    header,
+    .search-box,
+    .category-filters {
+        display: block;
+    }
+
+    .rooms-grid {
+        grid-template-columns: repeat(2, 1fr);
+    }
+}
+
+/* ============================================
+   DESKTOP BREAKPOINT (1024px+)
+   ============================================ */
+
+@media (min-width: 1024px) {
+    .sidebar {
+        width: 280px;
+        padding: 2rem;
+    }
+
+    .main-content {
+        padding: 2.5rem;
+    }
+
+    header h2 {
+        font-size: 1.5rem;
+    }
+
+    .rooms-grid {
+        grid-template-columns: repeat(3, 1fr);
+    }
+
+    .category-filters {
+        flex-wrap: wrap;
+        overflow-x: visible;
+    }
+}
+
+/* ============================================
+   LARGE DESKTOP BREAKPOINT (1280px+)
+   ============================================ */
+
+@media (min-width: 1280px) {
+    .rooms-grid {
+        grid-template-columns: repeat(4, 1fr);
+    }
+}
+
+/* ============================================
+   TOUCH DEVICE OPTIMIZATIONS
+   ============================================ */
+
+@media (hover: none) {
+
+    .room-card:hover,
+    .menu-btn:hover,
+    .cat-filter:hover,
+    .btn-request:hover {
+        transform: none;
+    }
+
+    .room-card:active,
+    .btn-request:active,
+    .btn-submit:active {
+        transform: scale(0.98);
+    }
+}
+
+/* ============================================
+   SAFE AREA INSETS (Notch devices)
+   ============================================ */
+
+@supports (padding: max(0px)) {
+    .sidebar {
+        padding-bottom: max(1rem, env(safe-area-inset-bottom));
+    }
+
+    .main-content {
+        padding-bottom: max(90px, env(safe-area-inset-bottom) + 90px);
+    }
+}
+
+/* ============================================
+   DARK MODE SUPPORT
+   ============================================ */
+
+@media (prefers-color-scheme: dark) {
+    :root {
+        --bg-primary: #0f172a;
+        --bg-secondary: #1e293b;
+        --text-primary: #f1f5f9;
+        --text-secondary: #94a3b8;
+    }
+
+    .room-card,
+    .schedule-item,
+    .request-item,
+    .modal-content {
+        background: #1e293b;
+        border-color: #334155;
+    }
+
+    .search-box input,
+    .form-group input,
+    .form-group textarea {
+        background: #0f172a;
+        border-color: #334155;
+        color: white;
+    }
+
+    .cat-filter {
+        background: #1e293b;
+        border-color: #334155;
+    }
+}
+
+/* ============================================
+   ANIMATIONS
+   ============================================ */
+
+@keyframes fadeIn {
+    from {
+        opacity: 0;
+        transform: translateY(10px);
+    }
+
+    to {
+        opacity: 1;
+        transform: translateY(0);
+    }
+}
+
+.room-card,
+.schedule-item,
+.request-item {
+    animation: fadeIn 0.3s ease;
+}
+
+/* ============================================
+   PROFILE MODAL
+   ============================================ */
+
+#profileModal .modal-content {
+    max-width: 400px;
+    border-radius: var(--radius-lg);
+}
+
+#profileModal .form-group {
+    margin-bottom: 1rem;
+}
+
+#profileModal .form-group label {
+    display: block;
+    font-size: 0.9rem;
+    font-weight: 600;
+    color: var(--text-primary);
+    margin-bottom: 0.5rem;
+}
+
+#profileModal .form-group input {
+    width: 100%;
+    padding: 0.75rem;
+    border: 2px solid #e2e8f0;
+    border-radius: var(--radius-md);
+    font-size: 1rem;
+    font-family: inherit;
+    transition: var(--transition);
+}
+
+#profileModal .form-group input:focus {
+    outline: none;
+    border-color: var(--primary);
+    box-shadow: 0 0 0 3px rgba(192, 57, 43, 0.1);
+}
+
+#profileModal .modal-footer {
+    display: flex;
+    gap: 0.75rem;
+    padding: 1rem;
+    border-top: 1px solid #e2e8f0;
+    background: #f8f9fa;
+}
+
+#profileModal .btn-cancel,
+#profileModal .btn-submit {
+    flex: 1;
+    padding: 0.75rem 1rem;
+    border-radius: var(--radius-md);
+    font-size: 1rem;
+    font-weight: 600;
+    cursor: pointer;
+    transition: var(--transition);
+    border: none;
+}
+
+#profileModal .btn-cancel {
+    background: var(--bg-secondary);
+    color: var(--text-secondary);
+}
+
+#profileModal .btn-submit {
+    background: var(--primary);
+    color: white;
+}
+
+#profileModal .btn-submit:active {
+    background: var(--primary-dark);
+    transform: scale(0.98);
+}
+
+/* ============================================
+   MOBILE PROFILE USERNAME & SEARCH
+   ============================================ */
+
+.mobile-profile-username {
+    font-size: 13px;
+    font-weight: 500;
+    color: white;
+    max-width: 100px;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+.mobile-search-container {
+    width: 100%;
+    padding: 8px 16px 12px 16px;
+    background: var(--primary);
+}
+
+.mobile-search-bar {
+    width: 100%;
+    padding: 8px 12px;
+    background: white;
+    border: 1px solid rgba(0, 0, 0, 0.12);
+    color: #000;
+    border-radius: var(--radius-md);
+    font-size: 12px;
+    outline: none;
+    transition: var(--transition);
+}
+
+.mobile-search-bar::placeholder {
+    color: rgba(0, 0, 0, 0.45);
+}
+
+.mobile-search-bar:focus {
+    background: #fff;
+    border-color: rgba(0, 0, 0, 0.2);
+    box-shadow: 0 0 0 3px rgba(0, 0, 0, 0.08);
+}
+
+/* ============================================
+   DATE PICKER - VIEW SCHEDULE MODAL
+   ============================================ */
+
+.date-picker-group {
+    display: flex;
+    gap: 10px;
+    margin-bottom: 20px;
+    align-items: flex-end;
+    flex-wrap: wrap;
+}
+
+.date-picker {
+    flex: 1;
+    min-width: 70px;
+    display: flex;
+    flex-direction: column;
+}
+
+.date-picker label {
+    font-size: 11px;
+    font-weight: 600;
+    color: var(--text-primary);
+    margin-bottom: 4px;
+}
+
+.date-input {
+    padding: 8px;
+    border: 2px solid #e2e8f0;
+    border-radius: var(--radius-md);
+    font-size: 12px;
+    outline: none;
+    transition: var(--transition);
+}
+
+.date-input:focus {
+    border-color: var(--primary);
+    box-shadow: 0 0 0 3px rgba(192, 57, 43, 0.1);
+}
+
+.btn-search-schedule {
+    flex: 1;
+    min-width: 100px;
+    padding: 8px 12px;
+    background: var(--primary);
+    color: white;
+    border: none;
+    border-radius: var(--radius-md);
+    font-size: 11px;
+    font-weight: 600;
+    cursor: pointer;
+    transition: var(--transition);
+    white-space: nowrap;
+}
+
+.btn-search-schedule:hover {
+    background: var(--primary-dark);
+}
+
+.btn-search-schedule:active {
+    transform: scale(0.98);
+}
+
+/* ============================================
+   SCHEDULE TIMELINE
+   ============================================ */
+
+.schedule-timeline {
+    display: flex;
+    flex-direction: column;
+    gap: 12px;
+}
+
+.schedule-timeline-item {
+    background: white;
+    border-radius: var(--radius-md);
+    padding: 12px;
+    border-left: 4px solid var(--primary);
+    box-shadow: var(--shadow-sm);
+}
+
+.schedule-time {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    margin-bottom: 8px;
+    font-weight: 600;
+    font-size: 12px;
+    flex-wrap: wrap;
+}
+
+.time-block {
+    background: transparent;
+    padding: 0;
+    border-radius: 0;
+    color: #000;
+    font-size: 12px;
+    font-weight: 600;
+}
+
+.time-separator {
+    color: #000;
+    font-size: 11px;
+    font-weight: 600;
+}
+
+.schedule-details {
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+    font-size: 11px;
+}
+
+.schedule-instructor {
+    color: #000;
+    font-weight: 600;
+}
+
+.schedule-purpose {
+    color: var(--text-secondary);
+    font-style: italic;
+}
+
+/* ============================================
+   NOTIFICATION BADGE - IMPROVED VISIBILITY
+   ============================================ */
+
+.notification-badge {
+    position: absolute;
+    top: 4px;
+    right: 4px;
+    background: var(--danger);
+    color: white;
+    font-size: 10px;
+    padding: 2px 6px;
+    border-radius: 10px;
+    min-width: 16px;
+    text-align: center;
+    font-weight: bold;
+    opacity: 1;
+    box-shadow: 0 1px 4px rgba(0, 0, 0, 0.15);
+}

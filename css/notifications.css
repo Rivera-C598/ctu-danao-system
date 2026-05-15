@@ -1,0 +1,368 @@
+/* ============================================
+   CTU Room Management System - Notifications Styles
+   Real-time notification UI components
+   ============================================ */
+
+/* Notification Area (Container) */
+.notification-area {
+    position: fixed;
+    top: 20px;
+    right: 20px;
+    z-index: 10000;
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+    max-width: 400px;
+    pointer-events: none;
+}
+
+/* Individual Notification Toast */
+.notification {
+    background: white;
+    border-radius: var(--radius-lg);
+    padding: 16px;
+    box-shadow: var(--shadow-xl);
+    border-left: 5px solid var(--primary);
+    animation: slideIn 0.3s ease;
+    pointer-events: auto;
+    min-width: 300px;
+    max-width: 400px;
+}
+
+.notification.removing {
+    animation: slideOut 0.3s ease;
+}
+
+@keyframes slideIn {
+    from {
+        transform: translateX(450px);
+        opacity: 0;
+    }
+
+    to {
+        transform: translateX(0);
+        opacity: 1;
+    }
+}
+
+@keyframes slideOut {
+    from {
+        transform: translateX(0);
+        opacity: 1;
+    }
+
+    to {
+        transform: translateX(450px);
+        opacity: 0;
+    }
+}
+
+/* Notification Types */
+.notification-success {
+    border-left-color: var(--available);
+    background: linear-gradient(135deg, rgba(39, 174, 96, 0.1), transparent);
+}
+
+.notification-error {
+    border-left-color: var(--rejected);
+    background: linear-gradient(135deg, rgba(231, 76, 60, 0.1), transparent);
+}
+
+.notification-warning {
+    border-left-color: var(--pending);
+    background: linear-gradient(135deg, rgba(243, 156, 18, 0.1), transparent);
+}
+
+.notification-info {
+    border-left-color: var(--accent);
+    background: linear-gradient(135deg, rgba(41, 128, 185, 0.1), transparent);
+}
+
+/* Notification Header */
+.notification-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 8px;
+}
+
+.notification-header strong {
+    font-size: var(--font-size-md);
+    color: var(--gray-800);
+    margin: 0;
+}
+
+/* Notification Close Button */
+.notification-close {
+    background: none;
+    border: none;
+    font-size: 1.5rem;
+    color: var(--gray-500);
+    cursor: pointer;
+    padding: 0;
+    width: 28px;
+    height: 28px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    border-radius: 50%;
+    transition: var(--transition-fast);
+}
+
+.notification-close:hover {
+    background: rgba(0, 0, 0, 0.1);
+    color: var(--gray-700);
+}
+
+/* Notification Body */
+.notification-body {
+    font-size: var(--font-size-sm);
+    color: var(--gray-700);
+    line-height: 1.4;
+}
+
+/* ============================================
+   NOTIFICATION CENTER MODAL
+   ============================================ */
+
+.notification-modal {
+    display: none;
+    position: fixed;
+    top: 0;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    background: rgba(0, 0, 0, 0.7);
+    z-index: 9999;
+    align-items: center;
+    justify-content: flex-end;
+    animation: fadeIn 0.3s ease;
+}
+
+@keyframes fadeIn {
+    from {
+        opacity: 0;
+    }
+
+    to {
+        opacity: 1;
+    }
+}
+
+.notification-modal-content {
+    background: white;
+    width: 100%;
+    max-width: 500px;
+    height: 100vh;
+    max-height: 600px;
+    border-radius: var(--radius-xl) 0 0 var(--radius-xl);
+    display: flex;
+    flex-direction: column;
+    box-shadow: var(--shadow-xl);
+    animation: slideInRight 0.3s ease;
+}
+
+@keyframes slideInRight {
+    from {
+        transform: translateX(100%);
+    }
+
+    to {
+        transform: translateX(0);
+    }
+}
+
+/* Modal Header */
+.notification-modal-header {
+    padding: 20px;
+    border-bottom: 2px solid var(--gray-200);
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+}
+
+.notification-modal-header h2 {
+    margin: 0;
+    color: var(--primary);
+    font-size: var(--font-size-xl);
+}
+
+.modal-close-btn {
+    background: none;
+    border: none;
+    font-size: 2rem;
+    color: var(--gray-500);
+    cursor: pointer;
+    padding: 0;
+    width: 40px;
+    height: 40px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    border-radius: 50%;
+    transition: var(--transition-fast);
+}
+
+.modal-close-btn:hover {
+    background: var(--gray-200);
+    color: var(--gray-800);
+}
+
+/* Notification List */
+.notification-list {
+    flex: 1;
+    overflow-y: auto;
+    padding: 0;
+}
+
+.notification-item {
+    padding: 16px 20px;
+    border-bottom: 1px solid var(--gray-200);
+    transition: var(--transition-fast);
+    position: relative;
+}
+
+.notification-item:hover {
+    background: var(--gray-100);
+}
+
+.notification-item-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 8px;
+}
+
+.notification-item-header strong {
+    color: var(--gray-800);
+    font-size: var(--font-size-md);
+}
+
+.notification-time {
+    font-size: var(--font-size-xs);
+    color: var(--gray-500);
+}
+
+.notification-item-body {
+    color: var(--gray-700);
+    font-size: var(--font-size-sm);
+    line-height: 1.5;
+}
+
+/* Notification Status Badges */
+.notification-item.notification-success {
+    border-left: 4px solid var(--available);
+}
+
+.notification-item.notification-error {
+    border-left: 4px solid var(--rejected);
+}
+
+.notification-item.notification-warning {
+    border-left: 4px solid var(--pending);
+}
+
+.notification-item.notification-info {
+    border-left: 4px solid var(--accent);
+}
+
+.badge-unread {
+    position: absolute;
+    top: 16px;
+    right: 20px;
+    background: var(--primary);
+    color: white;
+    padding: 4px 8px;
+    border-radius: var(--radius-md);
+    font-size: var(--font-size-xs);
+    font-weight: bold;
+}
+
+/* No Notifications Message */
+.no-notifications {
+    text-align: center;
+    padding: 40px 20px;
+    color: var(--gray-500);
+    font-size: var(--font-size-md);
+}
+
+/* Modal Footer */
+.notification-modal-footer {
+    padding: 16px 20px;
+    border-top: 2px solid var(--gray-200);
+    display: flex;
+    justify-content: space-between;
+    gap: 10px;
+}
+
+.btn-secondary {
+    padding: 10px 20px;
+    background: var(--gray-200);
+    color: var(--gray-800);
+    border: none;
+    border-radius: var(--radius-lg);
+    cursor: pointer;
+    font-weight: bold;
+    transition: var(--transition-fast);
+    flex: 1;
+}
+
+.btn-secondary:hover {
+    background: var(--gray-300);
+}
+
+/* ============================================
+   NOTIFICATION BELL ICON
+   ============================================ */
+
+.notification-bell {
+    position: relative;
+    cursor: pointer;
+    font-size: 1.5rem;
+    transition: var(--transition-fast);
+}
+
+.notification-bell:hover {
+    transform: scale(1.1);
+}
+
+.notification-badge {
+    position: absolute;
+    top: -8px;
+    right: -8px;
+    background: var(--rejected);
+    color: white;
+    border-radius: 50%;
+    width: 24px;
+    height: 24px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: var(--font-size-xs);
+    font-weight: bold;
+    border: 2px solid white;
+    box-shadow: var(--shadow-md);
+}
+
+/* ============================================
+   RESPONSIVE DESIGN
+   ============================================ */
+
+@media (max-width: 768px) {
+    .notification-area {
+        top: 10px;
+        right: 10px;
+        max-width: 100%;
+        padding: 0 10px;
+    }
+
+    .notification {
+        min-width: 100%;
+        max-width: 100%;
+    }
+
+    .notification-modal-content {
+        max-width: 100%;
+        border-radius: 0;
+    }
+}

@@ -1,0 +1,160 @@
+{
+    "exportInfo": {
+        "system": "CTU Room Management System",
+        "exportDate": "April 22, 2026",
+        "databaseType": "Node.js JSON-based Database",
+        "totalRooms": 9,
+        "totalLogs": 40,
+        "description": "Complete database export with all rooms and system logs"
+    },
+    "databaseStructure": {
+        "tables": [
+            {
+                "name": "rooms",
+                "description": "Stores all room information and scheduling data",
+                "columns": [
+                    {
+                        "name": "id",
+                        "type": "INT",
+                        "description": "Unique room identifier"
+                    },
+                    {
+                        "name": "instructor",
+                        "type": "VARCHAR(255)",
+                        "description": "Assigned instructor"
+                    },
+                    {
+                        "name": "category",
+                        "type": "VARCHAR(255)",
+                        "description": "Room category (Office, Comlab, Machine Room)"
+                    },
+                    {
+                        "name": "date",
+                        "type": "VARCHAR(50)",
+                        "description": "Current scheduled date"
+                    },
+                    {
+                        "name": "startTime",
+                        "type": "VARCHAR(50)",
+                        "description": "Schedule start time"
+                    },
+                    {
+                        "name": "endTime",
+                        "type": "VARCHAR(50)",
+                        "description": "Schedule end time"
+                    },
+                    {
+                        "name": "status",
+                        "type": "VARCHAR(50)",
+                        "description": "Room status (Available, Locked, Meeting, Maintenance)"
+                    },
+                    {
+                        "name": "history",
+                        "type": "LONGTEXT",
+                        "description": "Activity history log"
+                    },
+                    {
+                        "name": "type",
+                        "type": "VARCHAR(50)",
+                        "description": "Room type (register, etc)"
+                    },
+                    {
+                        "name": "scheduleId",
+                        "type": "INT",
+                        "description": "Current schedule ID"
+                    },
+                    {
+                        "name": "schedules",
+                        "type": "LONGTEXT",
+                        "description": "Schedule array data"
+                    }
+                ]
+            },
+            {
+                "name": "system_logs",
+                "description": "Tracks all system activities and user actions",
+                "columns": [
+                    {
+                        "name": "id",
+                        "type": "INT AUTO_INCREMENT PRIMARY KEY",
+                        "description": "Log entry ID"
+                    },
+                    {
+                        "name": "timestamp",
+                        "type": "DATETIME",
+                        "description": "When the action occurred"
+                    },
+                    {
+                        "name": "roomId",
+                        "type": "INT",
+                        "description": "Related room ID"
+                    },
+                    {
+                        "name": "action",
+                        "type": "VARCHAR(50)",
+                        "description": "Action type (approve, reject, reset, etc)"
+                    },
+                    {
+                        "name": "user",
+                        "type": "VARCHAR(255)",
+                        "description": "User who performed the action"
+                    },
+                    {
+                        "name": "category",
+                        "type": "VARCHAR(255)",
+                        "description": "Room category"
+                    },
+                    {
+                        "name": "details",
+                        "type": "LONGTEXT",
+                        "description": "Action details"
+                    },
+                    {
+                        "name": "status",
+                        "type": "VARCHAR(50)",
+                        "description": "Resulting status"
+                    }
+                ]
+            }
+        ]
+    },
+    "roomSummary": {
+        "totalRooms": 9,
+        "byCategory": {
+            "Comlab Room": 7,
+            "Office Room": 1,
+            "Machine Room": 0
+        },
+        "byStatus": {
+            "Available": 9,
+            "Locked": 0,
+            "Meeting": 0,
+            "Maintenance": 0
+        },
+        "assignedInstructors": [
+            "guenmark",
+            "aizy",
+            "admin1"
+        ]
+    },
+    "activitySummary": {
+        "totalLogEntries": 40,
+        "logTypes": [
+            "approve",
+            "reject",
+            "reset",
+            "status",
+            "clear",
+            "request",
+            "admin-create",
+            "remove"
+        ],
+        "activeUsers": [
+            "guenmark",
+            "aizy",
+            "admin1",
+            "Anonymous"
+        ],
+        "dateRange": "2026-04-19 to 2026-04-21"
+    }
+}

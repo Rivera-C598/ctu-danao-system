@@ -1,0 +1,293 @@
+/* ============================================
+   CTU Room Management System - Modal Styles
+   ============================================ */
+
+/* Modal Overlay */
+.modal {
+    position: fixed;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    background: rgba(0, 0, 0, 0.6);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    z-index: 9999;
+    backdrop-filter: blur(5px);
+}
+
+/* Modal Content */
+.modal-content {
+    background: white;
+    border-radius: var(--radius-xl);
+    width: 90%;
+    max-width: 450px;
+    max-height: calc(100vh - 40px);
+    overflow-y: auto;
+    animation: modalSlideIn 0.3s ease;
+}
+
+@keyframes modalSlideIn {
+    from {
+        opacity: 0;
+        transform: translateY(-50px);
+    }
+
+    to {
+        opacity: 1;
+        transform: translateY(0);
+    }
+}
+
+/* Modal Header */
+.modal-header {
+    padding: 20px 25px;
+    border-bottom: 1px solid #eee;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+}
+
+.modal-header h3 {
+    margin: 0;
+    color: #000;
+}
+
+.btn-close {
+    background: none;
+    border: none;
+    font-size: 1.5rem;
+    cursor: pointer;
+    color: #999;
+    transition: color var(--transition-normal);
+}
+
+.btn-close:hover {
+    color: var(--primary);
+}
+
+/* Modal Body */
+.modal-body {
+    padding: 25px;
+}
+
+/* Room Preview in Modal */
+.room-preview {
+    background: #f8f9fa;
+    padding: 15px;
+    border-radius: var(--radius-lg);
+    margin-bottom: 20px;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+}
+
+.room-preview .room-number {
+    color: var(--primary);
+    font-size: 1.3rem;
+}
+
+.room-preview .room-category {
+    margin: 0;
+    background: var(--instructor);
+    color: white;
+}
+
+/* Form Groups */
+.form-group {
+    margin-bottom: 20px;
+}
+
+.form-group label {
+    display: block;
+    margin-bottom: 8px;
+    color: #333;
+    font-weight: 600;
+    font-size: 0.9rem;
+}
+
+.form-group input,
+.form-group textarea,
+.form-group select {
+    width: 100%;
+    padding: 12px;
+    border: 2px solid #e0e0e0;
+    border-radius: var(--radius-md);
+    font-size: 0.95rem;
+    transition: var(--transition-normal);
+    font-family: inherit;
+}
+
+.form-group input:focus,
+.form-group textarea:focus,
+.form-group select:focus {
+    border-color: var(--instructor);
+    outline: none;
+}
+
+/* Form Row (for side-by-side inputs) */
+.form-row {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 15px;
+}
+
+/* Conflict Warning */
+.conflict-warning {
+    background: #fff3cd;
+    color: #856404;
+    padding: 12px;
+    border-radius: var(--radius-md);
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    font-size: 0.9rem;
+}
+
+/* Modal Footer */
+.modal-footer {
+    padding: 20px 25px;
+    border-top: 1px solid #eee;
+    display: flex;
+    justify-content: flex-end;
+    gap: 10px;
+}
+
+/* Cancel Button */
+.btn-cancel {
+    padding: 10px 20px;
+    background: #ecf0f1;
+    color: #666;
+    border: none;
+    border-radius: var(--radius-md);
+    cursor: pointer;
+    font-weight: 600;
+    transition: var(--transition-normal);
+}
+
+.btn-cancel:hover {
+    background: #d5dbdb;
+}
+
+/* Submit Button */
+.btn-submit {
+    padding: 10px 25px;
+    background: var(--instructor);
+    color: white;
+    border: none;
+    border-radius: var(--radius-md);
+    cursor: pointer;
+    font-weight: bold;
+    transition: var(--transition-normal);
+}
+
+.btn-submit:hover {
+    background: #2980b9;
+}
+
+.btn-submit:disabled {
+    background: #bdc3c7;
+    cursor: not-allowed;
+}
+
+/* Request Type Options */
+.request-type-options {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 12px;
+}
+
+.radio-label {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    padding: 12px;
+    border: 2px solid #e0e0e0;
+    border-radius: var(--radius-md);
+    cursor: pointer;
+    transition: all var(--transition-normal);
+}
+
+.radio-label:hover {
+    border-color: var(--instructor);
+    background: #f0f7ff;
+}
+
+.radio-label input[type="radio"] {
+    margin: 0;
+    cursor: pointer;
+    width: auto;
+    border: none;
+}
+
+.radio-label input[type="radio"]:checked+.radio-text {
+    color: var(--instructor);
+    font-weight: 600;
+}
+
+.radio-label input[type="radio"]:checked {
+    accent-color: var(--instructor);
+}
+
+.radio-text {
+    font-weight: 500;
+    color: #333;
+    font-size: 0.9rem;
+}
+
+/* Confirm Button */
+.btn-confirm {
+    padding: 10px 25px;
+    background: var(--primary);
+    color: white;
+    border: none;
+    border-radius: var(--radius-md);
+    cursor: pointer;
+    font-weight: bold;
+    transition: var(--transition-normal);
+}
+
+.btn-confirm:hover {
+    background: #a93226;
+    box-shadow: 0 2px 8px rgba(192, 57, 43, 0.3);
+}
+
+.btn-confirm:disabled {
+    background: #bdc3c7;
+    cursor: not-allowed;
+}
+
+/* Session Info Box */
+.session-info-box {
+    background: #f8f9fa;
+    padding: 20px;
+    border-radius: var(--radius-lg);
+    margin-bottom: 20px;
+}
+
+.session-info-box h4 {
+    margin: 0 0 15px 0;
+    font-size: 1rem;
+    color: var(--primary);
+}
+
+.session-info-box p {
+    margin: 8px 0;
+    font-size: 0.95rem;
+    line-height: 1.5;
+}
+
+.session-info-box strong {
+    color: #333;
+    font-weight: 600;
+}
+
+/* Complete Session Modal Specific */
+.complete-session-modal .modal-header {
+    background: linear-gradient(135deg, rgba(39, 174, 96, 0.1), rgba(41, 50, 65, 0.05));
+}
+
+.complete-session-modal .modal-body {
+    padding: 30px 25px;
+}

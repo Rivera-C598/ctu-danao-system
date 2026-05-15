@@ -1,0 +1,368 @@
+/* ============================================
+   CTU Room Management System - Instructor Styles
+   ============================================ */
+
+/* Instructor Sidebar */
+.instructor-sidebar {
+    border-right: 4px solid var(--instructor);
+}
+
+.instructor-sidebar .sidebar-header-box {
+    background: var(--instructor);
+}
+
+/* Instructor Profile */
+.instructor-profile {
+    background: linear-gradient(135deg, var(--instructor), #2980b9);
+}
+
+/* Instructor Menu */
+.instructor-menu {
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+    margin-bottom: 20px;
+}
+
+.menu-btn {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    padding: 12px 15px;
+    border: none;
+    background: white;
+    border-radius: var(--radius-md);
+    cursor: pointer;
+    transition: var(--transition-normal);
+    font-size: 0.9rem;
+    color: #555;
+    text-align: left;
+    position: relative;
+}
+
+.menu-btn:hover {
+    background: #f0f0f0;
+    transform: translateX(5px);
+}
+
+.menu-btn.active {
+    background: var(--instructor);
+    color: white;
+}
+
+.menu-btn .badge {
+    position: absolute;
+    right: 10px;
+    background: var(--pending);
+    color: white;
+    padding: 2px 8px;
+    border-radius: 10px;
+    font-size: 0.75rem;
+    font-weight: bold;
+}
+
+/* Instructor Stats */
+.instructor-stats {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 10px;
+    margin-bottom: 20px;
+}
+
+.stat-box {
+    background: white;
+    padding: 15px;
+    border-radius: var(--radius-lg);
+    text-align: center;
+    box-shadow: var(--shadow-sm);
+}
+
+.stat-number {
+    display: block;
+    font-size: 1.5rem;
+    font-weight: bold;
+    color: var(--instructor);
+}
+
+.stat-label {
+    font-size: 0.75rem;
+    color: #666;
+}
+
+/* Instructor Container */
+.instructor-container {
+    max-width: 1200px;
+}
+
+/* Category Filters */
+.category-filters {
+    display: flex;
+    gap: 10px;
+    margin-bottom: 20px;
+    flex-wrap: wrap;
+}
+
+.cat-filter {
+    padding: 8px 16px;
+    border: 2px solid #e0e0e0;
+    background: white;
+    border-radius: 20px;
+    cursor: pointer;
+    transition: var(--transition-normal);
+    font-size: 0.85rem;
+}
+
+.cat-filter:hover {
+    border-color: var(--instructor);
+    color: var(--instructor);
+}
+
+.cat-filter.active {
+    background: var(--instructor);
+    color: white;
+    border-color: var(--instructor);
+}
+
+/* Rooms Grid */
+.rooms-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
+    gap: 20px;
+}
+
+/* Room Card */
+.room-card {
+    background: white;
+    border-radius: var(--radius-lg);
+    overflow: hidden;
+    box-shadow: var(--shadow-md);
+    transition: var(--transition-normal);
+    border: 2px solid transparent;
+}
+
+.room-card:hover {
+    transform: translateY(-5px);
+    box-shadow: var(--shadow-lg);
+    border-color: var(--instructor);
+}
+
+.room-card-header {
+    background: var(--available);
+    color: white;
+    padding: 15px 20px;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+}
+
+.room-card-header.scheduled {
+    background: var(--meeting);
+}
+
+.room-number {
+    font-size: 1.5rem;
+    font-weight: bold;
+}
+
+.room-status-badge {
+    padding: 4px 10px;
+    background: rgba(255, 255, 255, 0.3);
+    border-radius: 20px;
+    font-size: 0.75rem;
+}
+
+.room-card-body {
+    padding: 20px;
+}
+
+.room-category {
+    display: inline-block;
+    padding: 5px 12px;
+    background: #f0f0f0;
+    border-radius: 15px;
+    font-size: 0.8rem;
+    color: #666;
+    margin-bottom: 15px;
+}
+
+.room-schedule-info {
+    margin-bottom: 15px;
+}
+
+.schedule-row {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    margin-bottom: 8px;
+    font-size: 0.9rem;
+    color: #555;
+}
+
+.schedule-row .label {
+    color: #999;
+    font-size: 0.8rem;
+    min-width: 40px;
+}
+
+.schedule-row .value {
+    font-weight: 600;
+    color: var(--primary);
+}
+
+.room-card-footer {
+    padding: 0 20px 20px;
+}
+
+.btn-request {
+    width: 100%;
+    padding: 12px;
+    background: var(--instructor);
+    color: white;
+    border: none;
+    border-radius: var(--radius-md);
+    cursor: pointer;
+    font-weight: bold;
+    transition: var(--transition-normal);
+}
+
+.btn-request:hover {
+    background: #2980b9;
+    transform: scale(1.02);
+}
+
+.btn-request:disabled {
+    background: #bdc3c7;
+    cursor: not-allowed;
+    transform: none;
+}
+
+/* Schedules & Requests Lists */
+.schedules-list,
+.requests-list {
+    display: flex;
+    flex-direction: column;
+    gap: 15px;
+}
+
+.schedule-item,
+.request-item {
+    background: white;
+    border-radius: var(--radius-lg);
+    padding: 20px;
+    box-shadow: var(--shadow-sm);
+    border-left: 4px solid var(--instructor);
+    display: flex;
+    flex-direction: column;
+    gap: 15px;
+}
+
+.request-item {
+    border-left-color: var(--pending);
+}
+
+.request-item.approved {
+    border-left-color: var(--available);
+}
+
+.request-item.rejected {
+    border-left-color: var(--rejected);
+}
+
+.item-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    gap: 15px;
+}
+
+.item-room {
+    font-weight: 600;
+    font-size: 1.1rem;
+    color: var(--primary);
+}
+
+.item-status {
+    padding: 6px 12px;
+    border-radius: 20px;
+    font-size: 0.8rem;
+    font-weight: bold;
+    text-transform: uppercase;
+}
+
+.item-details {
+    color: #666;
+    font-size: 0.9rem;
+    line-height: 1.6;
+}
+
+.item-details strong {
+    color: #333;
+}
+
+.item-actions {
+    display: flex;
+    gap: 10px;
+    flex-wrap: wrap;
+    padding-top: 10px;
+    border-top: 1px solid #e0e0e0;
+}
+
+.btn-remove {
+    padding: 10px 20px;
+    background: #e74c3c;
+    color: white;
+    border: none;
+    border-radius: var(--radius-md);
+    cursor: pointer;
+    font-weight: 600;
+    font-size: 0.9rem;
+    transition: var(--transition-normal);
+}
+
+.btn-remove:hover {
+    background: #c0392b;
+    transform: scale(1.02);
+}
+
+.btn-remove:active {
+    transform: scale(0.98);
+}
+
+.schedule-info h4,
+.request-info h4 {
+    margin: 0 0 8px 0;
+    color: var(--primary);
+    font-size: 1.2rem;
+}
+
+.schedule-status,
+.request-status {
+    padding: 6px 12px;
+    border-radius: 20px;
+    font-size: 0.8rem;
+    font-weight: bold;
+    text-transform: uppercase;
+}
+
+.status-approved {
+    background: #d4edda;
+    color: #155724;
+}
+
+.status-pending {
+    background: #fff3cd;
+    color: #856404;
+}
+
+.status-rejected {
+    background: #f8d7da;
+    color: #721c24;
+}
+
+/* No Data Message */
+.no-data-message {
+    text-align: center;
+    padding: 60px 20px;
+    color: #999;
+    font-size: 1.1rem;
+}

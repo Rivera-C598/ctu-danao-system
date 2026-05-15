@@ -1,0 +1,265 @@
+/* ============================================
+   CTU Room Management System - Responsive Styles
+   ============================================ */
+
+@media (max-width: 768px) {
+    /* Sidebar */
+    .sidebar {
+        width: 100%;
+        max-height: none;
+    }
+    
+    /* Dashboard Wrapper */
+    .dashboard-wrapper {
+        flex-direction: column;
+    }
+    
+    /* Role Buttons */
+    .role-buttons {
+        grid-template-columns: 1fr;
+    }
+    
+    /* Summary Bars */
+    .requests-summary-bar,
+    .database-summary {
+        grid-template-columns: repeat(2, 1fr);
+    }
+    
+    /* Rooms Grid */
+    .rooms-grid {
+        grid-template-columns: 1fr;
+    }
+    
+    /* Form Row */
+    .form-row {
+        grid-template-columns: 1fr;
+    }
+    
+    /* Instructor Stats */
+    .instructor-stats {
+        grid-template-columns: 1fr;
+    }
+    
+    /* Filters */
+    .category-filters,
+    .requests-filters {
+        justify-content: center;
+    }
+    
+    .monitoring-filters,
+    .database-filters {
+        flex-direction: column;
+    }
+    
+    /* Add Room Form */
+    .add-room-form {
+        flex-direction: column;
+        align-items: stretch;
+    }
+    
+    .add-room-form input,
+    .add-room-form select {
+        width: 100% !important;
+    }
+    
+    .time-range {
+        justify-content: space-between;
+    }
+    
+    .time-range input[type="time"] {
+        flex: 1;
+    }
+    
+    /* Navigation Tabs */
+    .nav-tabs {
+        flex-wrap: wrap;
+    }
+    
+    .nav-tab {
+        flex: 1 0 50%;
+        font-size: 0.7rem;
+        padding: 10px 2px;
+    }
+    
+    /* Status Cards */
+    .status-cards {
+        flex-direction: row;
+        flex-wrap: wrap;
+    }
+    
+    .status-card {
+        flex: 1 0 45%;
+    }
+    
+    /* Schedule/Request Items */
+    .schedule-item,
+    .request-item {
+        grid-template-columns: 1fr;
+        text-align: center;
+    }
+    
+    .schedule-details,
+    .request-details {
+        justify-content: center;
+    }
+    
+    /* Room Card */
+    .room-card-header {
+        flex-direction: column;
+        gap: 5px;
+        text-align: center;
+    }
+    
+    /* Modal */
+    .room-preview {
+        flex-direction: column;
+        gap: 10px;
+        text-align: center;
+    }
+    
+    .modal-footer {
+        flex-direction: column;
+    }
+    
+    .modal-footer button {
+        width: 100%;
+    }
+    
+    /* Request Actions */
+    .request-actions {
+        flex-direction: column;
+    }
+    
+    .btn-approve,
+    .btn-reject {
+        width: 100%;
+    }
+    
+    /* Notification Actions */
+    .notification-actions {
+        flex-direction: column;
+    }
+    
+    .btn-return {
+        width: 100%;
+    }
+    
+    /* Instructor Menu */
+    .instructor-menu {
+        flex-direction: row;
+        flex-wrap: wrap;
+    }
+    
+    .menu-btn {
+        flex: 1 0 45%;
+        justify-content: center;
+    }
+    
+    .menu-btn .badge {
+        position: static;
+        margin-left: 5px;
+    }
+    
+    /* Login Box */
+    .login-box {
+        margin: 10px;
+    }
+    
+    .login-header {
+        padding: 20px;
+    }
+    
+    .login-header h2 {
+        font-size: 1.4rem;
+    }
+    
+    .login-form {
+        padding: 20px;
+    }
+    
+    /* Container */
+    .container {
+        padding: 15px;
+        margin: 10px;
+    }
+    
+    /* Header */
+    header h2 {
+        font-size: 1.8rem;
+    }
+    
+    /* System Time */
+    .system-time {
+        font-size: 0.9rem;
+    }
+    
+    /* Tables */
+    table {
+        font-size: 0.8rem;
+    }
+    
+    th, td {
+        padding: 8px 5px;
+    }
+    
+    /* Room Input */
+    .room-no-input {
+        width: 40px;
+        height: 35px;
+        font-size: 0.9rem;
+    }
+    
+    .schedule-time-range input[type="time"] {
+        width: 60px;
+        font-size: 0.75rem;
+    }
+}
+
+/* Extra Small Screens */
+@media (max-width: 480px) {
+    .requests-summary-bar,
+    .database-summary {
+        grid-template-columns: 1fr;
+    }
+    
+    .summary-card {
+        flex-direction: column;
+        text-align: center;
+    }
+    
+    .nav-tab {
+        flex: 1 0 100%;
+    }
+    
+    .status-card {
+        flex: 1 0 100%;
+    }
+    
+    .menu-btn {
+        flex: 1 0 100%;
+    }
+    
+    header h2 {
+        font-size: 1.5rem;
+    }
+    
+    .login-header h2 {
+        font-size: 1.2rem;
+    }
+    
+    .role-btn {
+        padding: 15px 10px;
+    }
+    
+    .role-icon {
+        font-size: 1.5rem;
+    }
+    
+    .role-text {
+        font-size: 0.85rem;
+    }
+    
+    .role-desc {
+        font-size: 0.7rem;
+    }
+}

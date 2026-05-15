@@ -1,0 +1,535 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Admin Panel | CTU Danao Room Management</title>
+    <link rel="icon" type="image/png" href="/assets/ctudanaologo.png">
+
+    <!-- SECURITY: Immediate authentication check - BLOCKS page rendering if not authenticated -->
+    <script>
+        // Check authentication IMMEDIATELY before page renders
+        (function () {
+            const currentUserStr = localStorage.getItem('ctu_current_user');
+            if (!currentUserStr || currentUserStr === 'null' || currentUserStr === '') {
+                console.warn('❌ UNAUTHORIZED ACCESS: Redirecting to login');
+                window.location.replace('/html/Login.html');
+                return;
+            }
+
+            try {
+                const currentUser = JSON.parse(currentUserStr);
+                if (!currentUser || currentUser.role !== 'admin') {
+                    console.warn('❌ FORBIDDEN: Admin role required');
+                    window.location.replace('/html/Login.html');
+                    return;
+                }
+            } catch (e) {
+                console.error('Auth error:', e);
+                window.location.replace('/html/Login.html');
+                return;
+            }
+        })();
+    </script>
+
+    <!-- CSS Files - FIXED PATHS -->
+    <link rel="stylesheet" href="/css/variables.css">
+    <link rel="stylesheet" href="/css/common.css">
+    <link rel="stylesheet" href="/css/modal.css">
+    <link rel="stylesheet" href="/css/admin.css">
+    <link rel="stylesheet" href="/css/notifications.css">
+    <link rel="stylesheet" href="/css/responsive.css">
+</head>
+
+<body>
+
+    <!-- ADMIN DASHBOARD -->
+    <div id="adminView" class="dashboard-wrapper">
+        <aside class="sidebar admin-sidebar">
+            <div class="sidebar-header-box">
+                <h3>ROOM MANAGEMENT</h3>
+            </div>
+
+            <div class="admin-profile profile-section">
+                <div class="profile-avatar admin-avatar">CTU</div>
+                <div class="profile-info">
+                    <span class="profile-name">System Administrator</span>
+                    <span class="profile-role">Server Management</span>
+                </div>
+            </div>
+
+            <!-- Navigation Tabs -->
+            <div class="nav-tabs">
+                <div class="nav-tab active" onclick="switchTab('dashboard')" id="tab-dashboard">Dashboard</div>
+                <div class="nav-tab" onclick="switchTab('monitoring')" id="tab-monitoring">Monitoring</div>
+                <div class="nav-tab" onclick="switchTab('requests')" id="tab-requests">Requests</div>
+                <div class="nav-tab" onclick="switchTab('database')" id="tab-database">Database</div>
+            </div>
+
+            <div class="sidebar-action">
+                <button class="btn-quick-register" onclick="openQuickRegisterModal()">+ Quick Register</button>
+            </div>
+
+            <!-- Dashboard Sidebar -->
+            <div class="status-cards" id="dashboardSidebar">
+                <div class="status-card card-all" onclick="filterByStatus('all')">
+                    <span class="status-label">All Rooms</span>
+                    <span class="status-count" id="countAll">0</span>
+                </div>
+                <div class="status-card card-available" onclick="filterByStatus('Available')">
+                    <span class="status-label">Available</span>
+                    <span class="status-count" id="countAvailable">0</span>
+                </div>
+                <div class="status-card card-locked" onclick="filterByStatus('Locked')">
+                    <span class="status-label">Locked</span>
+                    <span class="status-count" id="countLocked">0</span>
+                </div>
+                <div class="status-card card-meeting" onclick="filterByStatus('Meeting')">
+                    <span class="status-label">Meeting</span>
+                    <span class="status-count" id="countMeeting">0</span>
+                </div>
+                <div class="status-card card-maintenance" onclick="filterByStatus('Maintenance')">
+                    <span class="status-label">Maintenance</span>
+                    <span class="status-count" id="countMaintenance">0</span>
+                </div>
+                <button class="btn-create-admin" onclick="openCreateAdminModal()" style="margin-top: 15px;">Create
+                    Admin</button>
+            </div>
+
+            <!-- Requests Sidebar -->
+            <div class="requests-sidebar" id="requestsSidebar" style="display: none;">
+                <div class="requests-info-box">
+                    <h4>📋 Pending Requests</h4>
+                    <p>Manage instructor room requests</p>
+                    <div class="requests-stats">
+                        <div class="stat-item">
+                            <span class="stat-label">Pending:</span>
+                            <span class="stat-value" id="pendingCountSidebar">0</span>
+                        </div>
+                        <div class="stat-item">
+                            <span class="stat-label">Approved:</span>
+                            <span class="stat-value" id="approvedTodaySidebar">0</span>
+                        </div>
+                        <div class="stat-item">
+                            <span class="stat-label">Rejected:</span>
+                            <span class="stat-value" id="rejectedTodaySidebar">0</span>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Monitoring Sidebar Info -->
+            <div class="monitoring-sidebar" id="monitoringSidebar" style="display: none;">
+                <div class="monitoring-info-box">
+                    <h4>📊 Schedule Overview</h4>
+                    <p>View all scheduled rooms and their booking details.</p>
+                    <div class="monitoring-stats">
+                        <div class="stat-item">
+                            <span class="stat-label">Total Scheduled:</span>
+                            <span class="stat-value" id="totalScheduled">0</span>
+                        </div>
+                        <div class="stat-item">
+                            <span class="stat-label">Active Today:</span>
+                            <span class="stat-value" id="activeToday">0</span>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Database Sidebar Info -->
+            <div class="database-sidebar" id="databaseSidebar" style="display: none;">
+                <div class="database-info-box">
+                    <h4>🗄️ System Database</h4>
+                    <p>Complete system logs and activity history.</p>
+                    <div class="database-stats">
+                        <div class="stat-item">
+                            <span class="stat-label">Total Logs:</span>
+                            <span class="stat-value" id="totalLogs">0</span>
+                        </div>
+                        <div class="stat-item">
+                            <span class="stat-label">Today's Activity:</span>
+                            <span class="stat-value" id="todayActivity">0</span>
+                        </div>
+                        <div class="stat-item">
+                            <span class="stat-label">System Status:</span>
+                            <span class="stat-value" style="color: var(--available);">Online</span>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <button class="btn-logout admin-logout" onclick="logout()"> Logout</button>
+        </aside>
+
+        <main class="main-content">
+
+            <!-- DASHBOARD VIEW -->
+            <div class="container" id="dashboardView">
+
+                <header>
+                    <h2>CTU DANAO CAMPUS</h2>
+                    <p>DEPARTMENT OF TECHNOLOGY - ADMIN DASHBOARD</p>
+                </header>
+
+                <div id="quickRegisterModal" class="modal" style="display: none;"
+                    onclick="if (event.target === this) closeQuickRegisterModal()">
+                    <div class="modal-content" style="max-width: 760px; width: 100%;">
+                        <div class="modal-header">
+                            <h3>Quick Register</h3>
+                            <button class="btn-close" onclick="closeQuickRegisterModal()">&times;</button>
+                        </div>
+                        <div class="modal-body">
+                            <div class="add-room-form" style="margin-bottom: 0;">
+                                <strong>Quick Register:</strong>
+                                <input type="number" id="newRoomId" placeholder="Room No." style="width: 100px;">
+                                <select id="newRoomCat">
+                                    <option value="Comlab Room">Comlab Room</option>
+                                    <option value="Machine Room">Machine Room</option>
+                                    <option value="Library Room">Library Room</option>
+                                    <option value="Office Room">Office Room</option>
+                                </select>
+                                <select id="newRoomStatus">
+                                    <option value="Available">Available</option>
+                                    <option value="Locked">Locked</option>
+                                    <option value="Meeting">Meeting</option>
+                                    <option value="Maintenance">Maintenance</option>
+                                </select>
+
+                                <div class="dropdown">
+                                    <button class="btn-add dropdown-toggle" onclick="toggleDropdown('addDropdown')">+
+                                        Register ▼</button>
+                                    <div class="dropdown-menu" id="addDropdown">
+                                        <div class="dropdown-item" onclick="addNewRoom('register')">Register Room
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                        <div class="modal-footer">
+                            <button class="btn-cancel" onclick="closeQuickRegisterModal()">Cancel</button>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- CREATE ADMIN MODAL -->
+                <div id="createAdminModal" class="modal" style="display: none;"
+                    onclick="if (event.target === this) closeCreateAdminModal()">
+                    <div class="modal-content" style="max-width: 500px; width: 100%;">
+                        <div class="modal-header">
+                            <h3>Create Administrator Account</h3>
+                            <button class="btn-close" onclick="closeCreateAdminModal()">&times;</button>
+                        </div>
+                        <div class="modal-body">
+                            <div class="create-admin-form">
+                                <div class="form-group">
+                                    <label>Username *</label>
+                                    <input type="text" id="adminUsername" placeholder="Enter username" maxlength="30">
+                                    <small id="adminUsernameStatus" style="display: none;"></small>
+                                </div>
+
+                                <div class="form-group">
+                                    <label>Full Name *</label>
+                                    <input type="text" id="adminFullName" placeholder="Enter full name">
+                                </div>
+
+                                <div class="form-group">
+                                    <label>Email</label>
+                                    <input type="email" id="adminEmail" placeholder="Enter email (optional)">
+                                </div>
+
+                                <div class="form-group">
+                                    <label>Password *</label>
+                                    <div class="password-input-wrapper">
+                                        <input type="password" id="adminPassword"
+                                            placeholder="Enter password (min 6 characters)">
+                                        <button type="button" class="btn-toggle-password"
+                                            onclick="togglePasswordVisibility('adminPassword')">👁️</button>
+                                    </div>
+                                </div>
+
+                                <div class="form-group">
+                                    <label>Confirm Password *</label>
+                                    <div class="password-input-wrapper">
+                                        <input type="password" id="adminConfirmPassword" placeholder="Confirm password">
+                                        <button type="button" class="btn-toggle-password"
+                                            onclick="togglePasswordVisibility('adminConfirmPassword')">👁️</button>
+                                    </div>
+                                    <small id="adminPasswordMatch" style="display: none;"></small>
+                                </div>
+
+                                <div id="adminCreateMessage" class="form-message" style="display: none;"></div>
+                            </div>
+                        </div>
+                        <div class="modal-footer">
+                            <button class="btn-cancel" onclick="closeCreateAdminModal()">Cancel</button>
+                            <button class="btn-approve" onclick="createAdminAccount()">Create Admin</button>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="search-box">
+                    <input type="text" id="searchBar" placeholder="Search Room, Instructor, or Status..."
+                        onkeyup="filterTable()">
+                </div>
+
+                <table id="roomTable">
+                    <thead>
+                        <tr>
+                            <th style="width: 8%;">No.</th>
+                            <th style="width: 20%;">Borrower</th>
+                            <th style="width: 15%;">Category</th>
+                            <th style="width: 18%;">Schedule</th>
+                            <th style="width: 27%;">Room Status</th>
+                            <th style="width: 12%;">Manage</th>
+                        </tr>
+                    </thead>
+                    <tbody id="tableBody"></tbody>
+                </table>
+            </div>
+
+            <!-- MONITORING VIEW -->
+            <div class="container monitoring-container" id="monitoringView" style="display: none;">
+
+                <header>
+                    <h2> ROOM SCHEDULE MONITORING</h2>
+                    <p>All Scheduled Rooms Overview</p>
+                </header>
+
+                <div class="monitoring-filters">
+                    <input type="text" id="monitorSearch" placeholder="🔍 Search by Room No, Borrower, or Category..."
+                        onkeyup="filterMonitoring()">
+                    <input type="date" id="monitorDateFilter" onchange="filterMonitoring()">
+                    <select id="monitorStatusFilter" onchange="filterMonitoring()">
+                        <option value="all">All Status</option>
+                        <option value="Available">Available</option>
+                        <option value="Meeting">Meeting</option>
+                        <option value="Locked">Locked</option>
+                        <option value="Maintenance">Maintenance</option>
+                    </select>
+                </div>
+
+                <div class="monitoring-table-wrapper">
+                    <table id="monitoringTable">
+                        <thead>
+                            <tr>
+                                <th>Room No.</th>
+                                <th>Borrower Name</th>
+                                <th>Category</th>
+                                <th>Date (Day-Month-Year)</th>
+                                <th>Start Time</th>
+                                <th>End Time</th>
+                                <th>Duration</th>
+                                <th>Room Status</th>
+                            </tr>
+                        </thead>
+                        <tbody id="monitoringBody"></tbody>
+                    </table>
+                </div>
+
+                <div class="no-schedule-message" id="noScheduleMsg" style="display: none;">
+                    <p>No scheduled rooms found.</p>
+                </div>
+            </div>
+
+            <!-- REQUESTS MANAGEMENT VIEW -->
+            <div class="container requests-container" id="requestsView" style="display: none;">
+
+                <header>
+                    <h2> INSTRUCTOR REQUESTS</h2>
+                    <p>Review and manage room schedule requests</p>
+                </header>
+
+                <div class="requests-filters">
+                    <button class="filter-btn" onclick="filterRequests('all')">All Requests</button>
+                    <button class="filter-btn active" onclick="filterRequests('pending')"> Pending</button>
+                    <button class="filter-btn" onclick="filterRequests('approved')"> Approved</button>
+                    <button class="filter-btn" onclick="filterRequests('rejected')"> Rejected</button>
+                    <button class="filter-btn" onclick="filterRequests('today')"> Today's Request</button>
+                    <button class="filter-btn" onclick="filterRequests('future')"> Future Request</button>
+                </div>
+
+                <div class="requests-summary-bar">
+                    <div class="summary-item">
+                        <span class="summary-value" id="totalRequestsCount">0</span>
+                        <span class="summary-label">Total</span>
+                    </div>
+                    <div class="summary-item pending">
+                        <span class="summary-value" id="pendingRequestsCount">0</span>
+                        <span class="summary-label">Pending</span>
+                    </div>
+                    <div class="summary-item approved">
+                        <span class="summary-value" id="approvedRequestsCount">0</span>
+                        <span class="summary-label">Approved</span>
+                    </div>
+                    <div class="summary-item rejected">
+                        <span class="summary-value" id="rejectedRequestsCount">0</span>
+                        <span class="summary-label">Rejected</span>
+                    </div>
+                </div>
+
+                <div class="requests-table-wrapper">
+                    <table id="requestsTable">
+                        <thead>
+                            <tr>
+                                <th>Request ID</th>
+                                <th>Instructor</th>
+                                <th>Room</th>
+                                <th>Category</th>
+                                <th>Date & Time</th>
+                                <th>Purpose</th>
+                                <th>Status</th>
+                                <th>Actions</th>
+                            </tr>
+                        </thead>
+                        <tbody id="requestsBody"></tbody>
+                    </table>
+                </div>
+
+                <div id="noRequestsMsg" class="no-data-message" style="display: none;">
+                    <p>No requests found.</p>
+                </div>
+            </div>
+
+            <!-- DATABASE VIEW -->
+            <div class="container database-container" id="databaseView" style="display: none;">
+
+                <header>
+                    <h2> SYSTEM DATABASE</h2>
+                    <p>Complete Activity Logs & System Updates</p>
+                </header>
+
+                <div class="database-filters">
+                    <input type="text" id="databaseSearch" placeholder="🔍 Search logs by room, user, or action..."
+                        onkeyup="filterDatabase()">
+                    <input type="date" id="databaseDateFilter" onchange="filterDatabase()">
+                    <select id="databaseActionFilter" onchange="filterDatabase()">
+                        <option value="all">All Actions</option>
+                        <option value="register">Register</option>
+                        <option value="schedule">Schedule</option>
+                        <option value="request">Request</option>
+                        <option value="approve">Approve</option>
+                        <option value="reject">Reject</option>
+                        <option value="status">Status Change</option>
+                        <option value="reset">Reset</option>
+                        <option value="remove">Remove</option>
+                    </select>
+                    <button class="btn-export" onclick="exportDatabase()">Export Logs</button>
+                    <button class="btn-clear" onclick="clearAllLogs()">Clear All Logs</button>
+                </div>
+
+                <div class="database-summary">
+                    <div class="summary-card">
+                        <span class="summary-icon"></span>
+                        <div class="summary-info">
+                            <span class="summary-label">Registered</span>
+                            <span class="summary-value" id="dbRegisteredCount">0</span>
+                        </div>
+                    </div>
+                    <div class="summary-card">
+                        <span class="summary-icon"></span>
+                        <div class="summary-info">
+                            <span class="summary-label">Scheduled</span>
+                            <span class="summary-value" id="dbScheduledCount">0</span>
+                        </div>
+                    </div>
+                    <div class="summary-card">
+                        <span class="summary-icon"></span>
+                        <div class="summary-info">
+                            <span class="summary-label">Pending Req</span>
+                            <span class="summary-value" id="dbPendingCount">0</span>
+                        </div>
+                    </div>
+                    <div class="summary-card">
+                        <span class="summary-icon"></span>
+                        <div class="summary-info">
+                            <span class="summary-label">Status Changes</span>
+                            <span class="summary-value" id="dbStatusChanges">0</span>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="database-table-wrapper">
+                    <table id="databaseTable">
+                        <thead>
+                            <tr>
+                                <th>Timestamp</th>
+                                <th>Room No.</th>
+                                <th>Action</th>
+                                <th>User</th>
+                                <th>Category</th>
+                                <th>Details</th>
+                                <th>Status</th>
+                            </tr>
+                        </thead>
+                        <tbody id="databaseBody"></tbody>
+                    </table>
+                </div>
+
+                <div class="no-logs-message" id="noLogsMsg" style="display: none;">
+                    <p>No system logs found.</p>
+                </div>
+            </div>
+
+        </main>
+    </div>
+
+    <!-- JavaScript Files - FIXED PATHS -->
+    <!-- Socket.io for real-time sync -->
+    <script src="https://cdn.socket.io/4.7.2/socket.io.min.js"></script>
+
+    <!-- Utility & Auth Scripts -->
+    <script src="/js/utils/storage.js"></script>
+    <script src="/js/utils/auth-guard.js"></script>
+    <script src="/js/utils/notifications.js"></script>
+    <script src="/js/utils/helpers.js"></script>
+    <script src="/js/auth/login.js"></script>
+
+    <!-- Admin Dashboard Scripts -->
+    <script src="/js/admin/dashboard.js"></script>
+    <script src="/js/admin/monitoring.js"></script>
+    <script src="/js/admin/requests.js"></script>
+    <script src="/js/admin/database.js"></script>
+    <script src="/js/admin/roomManager.js"></script>
+
+    <script>
+        // Initialize Socket.io for real-time synchronization
+        const socket = io();
+
+        socket.on('connect', () => {
+            console.log('✅ Connected to server for real-time sync');
+            showNotification('Connected', 'Real-time synchronization active', 'success', 3000);
+        });
+
+        socket.on('disconnect', () => {
+            console.log('❌ Disconnected from server');
+            showNotification('Disconnected', 'Using local cache until reconnection', 'warning', 5000);
+        });
+
+        // Initialize on page load
+        document.addEventListener('DOMContentLoaded', function () {
+            // CHECK AUTHENTICATION - REDIRECT IF NOT AUTHORIZED
+            if (!protectPage()) {
+                return; // User not authenticated, redirected to login
+            }
+
+            const currentUser = getCurrentUser();
+            if (!currentUser || currentUser.role !== 'admin') {
+                console.warn('Unauthorized: Not an admin');
+                alert('⛔ Access Denied: Admin privileges required');
+                window.location.href = '/html/Login.html';
+                return;
+            }
+
+            initAdminView();
+
+            // Request notification permission
+            if ('Notification' in window && Notification.permission === 'default') {
+                Notification.requestPermission();
+            }
+        });
+    </script>
+
+</body>
+
+</html>
