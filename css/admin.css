@@ -1185,3 +1185,275 @@
     border-left-color: #d32f2f;
     color: #d32f2f;
 }
+
+/* ============================================
+   ADMIN TABLE
+   ============================================ */
+.admin-table {
+    width: 100%;
+    border-collapse: collapse;
+    margin: 16px 0;
+}
+
+.admin-table thead tr {
+    background: linear-gradient(135deg, var(--primary), #922b21);
+}
+
+.admin-table th {
+    background: transparent;
+    color: white;
+    padding: 14px 16px;
+    text-align: left;
+    font-weight: 700;
+    font-size: 0.88rem;
+    white-space: nowrap;
+}
+
+.admin-table td {
+    padding: 14px 16px;
+    border-bottom: 1px solid #f0f0f0;
+    vertical-align: middle;
+    font-size: 0.9rem;
+}
+
+.admin-table tr:hover td {
+    background: #fafafa;
+}
+
+.admin-table tr:last-child td {
+    border-bottom: none;
+}
+
+/* ============================================
+   TABLE PAGINATION
+   ============================================ */
+.table-pagination {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 10px 0;
+    font-size: 0.85rem;
+    color: #666;
+    gap: 10px;
+    flex-wrap: wrap;
+    margin-top: 8px;
+}
+
+.pagination-controls {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+}
+
+.pagination-btn {
+    padding: 6px 14px;
+    border: 1.5px solid #ddd;
+    background: white;
+    color: #333;
+    border-radius: 8px;
+    cursor: pointer;
+    font-size: 0.85rem;
+    font-weight: 600;
+    transition: all 0.15s ease;
+}
+
+.pagination-btn:hover:not(:disabled) {
+    border-color: var(--primary);
+    color: var(--primary);
+}
+
+.pagination-btn:disabled {
+    opacity: 0.35;
+    cursor: not-allowed;
+}
+
+/* ============================================
+   BTN-OUTLINE-ACTION
+   ============================================ */
+.btn-outline-action {
+    padding: 6px 14px;
+    background: transparent;
+    border: 1.5px solid var(--primary);
+    color: var(--primary);
+    border-radius: 8px;
+    cursor: pointer;
+    font-size: 0.82rem;
+    font-weight: 700;
+    transition: all 0.15s ease;
+    white-space: nowrap;
+}
+
+.btn-outline-action:hover {
+    background: var(--primary);
+    color: white;
+}
+
+.btn-outline-action:disabled {
+    opacity: 0.4;
+    cursor: not-allowed;
+}
+
+/* ============================================
+   BTN-DANGER-OUTLINE
+   ============================================ */
+.btn-danger-outline {
+    padding: 6px 14px;
+    background: transparent;
+    border: 1.5px solid #e74c3c;
+    color: #e74c3c;
+    border-radius: 8px;
+    cursor: pointer;
+    font-size: 0.82rem;
+    font-weight: 700;
+    transition: all 0.15s ease;
+    white-space: nowrap;
+}
+
+.btn-danger-outline:hover {
+    background: #e74c3c;
+    color: white;
+}
+
+/* ============================================
+   BTN-ACTION-PRIMARY
+   ============================================ */
+.btn-action-primary {
+    padding: 8px 18px;
+    background: var(--primary);
+    color: white;
+    border: none;
+    border-radius: 8px;
+    cursor: pointer;
+    font-size: 0.88rem;
+    font-weight: 700;
+    transition: all 0.15s ease;
+}
+
+.btn-action-primary:hover {
+    background: var(--primary-dark, #a93226);
+}
+
+/* ============================================
+   AUTO-APPROVE TOGGLE
+   ============================================ */
+.toggle-switch {
+    position: relative;
+    display: inline-block;
+    width: 44px;
+    height: 24px;
+    flex-shrink: 0;
+}
+
+.toggle-switch input {
+    opacity: 0;
+    width: 0;
+    height: 0;
+}
+
+.toggle-slider {
+    position: absolute;
+    cursor: pointer;
+    top: 0; left: 0; right: 0; bottom: 0;
+    background: #ccc;
+    border-radius: 24px;
+    transition: 0.3s;
+}
+
+.toggle-slider::before {
+    content: '';
+    position: absolute;
+    width: 18px;
+    height: 18px;
+    left: 3px;
+    bottom: 3px;
+    background: white;
+    border-radius: 50%;
+    transition: 0.3s;
+}
+
+.toggle-switch input:checked + .toggle-slider {
+    background: var(--primary);
+}
+
+.toggle-switch input:checked + .toggle-slider::before {
+    transform: translateX(20px);
+}
+
+/* ============================================
+   REGISTRATION CODE ITEMS
+   ============================================ */
+.reg-code-item {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 12px 14px;
+    border-radius: 10px;
+    border: 1.5px solid #eee;
+    margin-bottom: 8px;
+    background: white;
+    gap: 12px;
+    flex-wrap: wrap;
+}
+
+.reg-code-text {
+    font-family: monospace;
+    font-size: 1rem;
+    font-weight: 700;
+    color: var(--primary);
+    letter-spacing: 1px;
+}
+
+.reg-code-meta {
+    font-size: 0.78rem;
+    color: #888;
+    margin-top: 2px;
+}
+
+.badge-used {
+    background: #e8f5e9;
+    color: #2e7d32;
+    padding: 3px 10px;
+    border-radius: 20px;
+    font-size: 0.75rem;
+    font-weight: 700;
+}
+
+.badge-revoked {
+    background: #ffebee;
+    color: #c62828;
+    padding: 3px 10px;
+    border-radius: 20px;
+    font-size: 0.75rem;
+    font-weight: 700;
+}
+
+.badge-unused {
+    background: #fff3e0;
+    color: #e65100;
+    padding: 3px 10px;
+    border-radius: 20px;
+    font-size: 0.75rem;
+    font-weight: 700;
+}
+
+/* ============================================
+   MODAL HIDDEN CLASS
+   ============================================ */
+.modal.modal-hidden {
+    display: none !important;
+}
+
+/* ============================================
+   ADMIN CLOCK IN SIDEBAR
+   ============================================ */
+.admin-clock-wrap {
+    margin-top: 6px;
+}
+
+.admin-clock-display {
+    display: block;
+    font-size: 0.88rem;
+    font-weight: 600;
+    color: rgba(255,255,255,0.9);
+    text-align: center;
+}
