@@ -7,12 +7,25 @@ const bcrypt = require('bcrypt');
 const jwt = require('jsonwebtoken');
 const cookieParser = require('cookie-parser');
 const cors = require('cors');
+const helmet = require('helmet');
+const rateLimit = require('express-rate-limit');
 const { Pool } = require('pg');
 
 const PORT = process.env.PORT || 5501;
 const JWT_COOKIE = 'ctu_auth';
-const JWT_SECRET = process.env.JWT_SECRET || 'dev-only-change-this-secret';
 const DATABASE_URL = process.env.DATABASE_URL;
+const IS_PROD = process.env.NODE_ENV === 'production';
+
+const JWT_SECRET = process.env.JWT_SECRET;
+if (!JWT_SECRET) {
+    if (IS_PROD) throw new Error('JWT_SECRET environment variable is required in production.');
+    console.warn('WARNING: JWT_SECRET not set — using insecure dev-only default. NEVER do this in production.');
+}
+const _JWT_SECRET = JWT_SECRET || 'dev-only-change-this-secret';
+
+const CORS_ORIGIN = process.env.CORS_ORIGIN;
+if (!CORS_ORIGIN && IS_PROD) throw new Error('CORS_ORIGIN environment variable is required in production.');
+
 const STATUS_MAP = {
     locked: 'Locked',
     meeting: 'Meeting',
@@ -30,20 +43,29 @@ const pool = DATABASE_URL ? new Pool({
     ssl: process.env.DB_SSL === 'false' ? false : { rejectUnauthorized: false }
 }) : null;
 
+app.use(helmet({ contentSecurityPolicy: false }));
 app.use(cors({
-    origin: process.env.CORS_ORIGIN || true,
+    origin: CORS_ORIGIN || 'http://localhost:5501',
     credentials: true
 }));
 app.use(express.json({ limit: '1mb' }));
 app.use(cookieParser());
-app.use(express.static(path.join(__dirname), {
-    setHeaders: (res, filePath) => {
-        if (filePath.endsWith('.html')) {
-            res.setHeader('Content-Type', 'text/html; charset=utf-8');
-        }
-        res.setHeader('Cache-Control', 'no-cache');
-    }
-}));
+
+const loginLimiter = rateLimit({
+    windowMs: 15 * 60 * 1000,
+    max: 10,
+    standardHeaders: true,
+    legacyHeaders: false,
+    message: { error: 'Too many login attempts. Please try again in 15 minutes.' }
+});
+
+const registerLimiter = rateLimit({
+    windowMs: 60 * 60 * 1000,
+    max: 5,
+    standardHeaders: true,
+    legacyHeaders: false,
+    message: { error: 'Too many registration attempts. Please try again later.' }
+});
 
 function requireDb() {
     if (!pool) {
@@ -76,7 +98,6 @@ function publicUser(row) {
         username: row.username,
         fullName: row.full_name,
         email: row.email,
-        phoneNumber: row.phone_number,
         role: row.role,
         loginCount: row.login_count,
         lastLogin: row.last_login_at,
@@ -90,23 +111,35 @@ function signUser(row) {
         username: row.username,
         role: row.role,
         fullName: row.full_name
-    }, JWT_SECRET, { expiresIn: '12h' });
+    }, _JWT_SECRET, { expiresIn: '12h' });
 }
 
 function setAuthCookie(res, token) {
     res.cookie(JWT_COOKIE, token, {
         httpOnly: true,
-        sameSite: 'lax',
-        secure: process.env.NODE_ENV === 'production',
+        sameSite: 'strict',
+        secure: IS_PROD,
         maxAge: 12 * 60 * 60 * 1000
     });
+}
+
+function requireAuthHtml(req, res, next) {
+    const token = req.cookies[JWT_COOKIE];
+    if (!token) return res.redirect('/');
+    try {
+        jwt.verify(token, _JWT_SECRET);
+        next();
+    } catch (_error) {
+        res.clearCookie(JWT_COOKIE);
+        res.redirect('/');
+    }
 }
 
 function authOptional(req, _res, next) {
     const token = req.cookies[JWT_COOKIE];
     if (!token) return next();
     try {
-        req.user = jwt.verify(token, JWT_SECRET);
+        req.user = jwt.verify(token, _JWT_SECRET);
     } catch (_error) {
         req.user = null;
     }
@@ -117,7 +150,7 @@ function requireAuth(req, res, next) {
     const token = req.cookies[JWT_COOKIE];
     if (!token) return res.status(401).json({ error: 'Authentication required' });
     try {
-        req.user = jwt.verify(token, JWT_SECRET);
+        req.user = jwt.verify(token, _JWT_SECRET);
         next();
     } catch (_error) {
         res.status(401).json({ error: 'Invalid or expired session' });
@@ -209,7 +242,7 @@ async function buildSnapshot(user) {
         `),
         user?.role === 'admin'
             ? db.query('SELECT * FROM users ORDER BY created_at DESC')
-            : db.query('SELECT id, username, full_name, email, phone_number, role, login_count, last_login_at, created_at FROM users WHERE id = $1', [user?.id]),
+            : db.query('SELECT id, username, full_name, email, role, login_count, last_login_at, created_at FROM users WHERE id = $1', [user?.id]),
         db.query(`
             SELECT l.*, u.username, rm.room_number
             FROM system_logs l
@@ -251,6 +284,7 @@ async function buildSnapshot(user) {
     return {
         allRooms,
         pendingRequests,
+        roomRequests: pendingRequests,
         usersDatabase: userResult.rows.map(publicUser),
         systemLogs: logResult.rows.map((row) => ({
             id: row.id,
@@ -272,6 +306,34 @@ async function buildSnapshot(user) {
         })),
         notifications: notifResult.rows
     };
+}
+
+async function autoCompleteExpiredSessions(db) {
+    const today = manilaToday();
+    const nowManila = new Intl.DateTimeFormat('en-CA', {
+        timeZone: 'Asia/Manila', hour: '2-digit', minute: '2-digit', hour12: false
+    }).format(new Date());
+
+    const { rows: expired } = await db.query(`
+        SELECT s.id, s.room_id, s.request_id, s.requested_status
+        FROM room_schedules s
+        WHERE s.status = 'active' AND s.date = $1 AND s.end_time <= $2
+    `, [today, nowManila]);
+
+    for (const s of expired) {
+        const client = await db.connect();
+        try {
+            await client.query('BEGIN');
+            await client.query('UPDATE room_schedules SET status = $1, completed_at = now() WHERE id = $2', ['completed', s.id]);
+            await client.query('UPDATE room_requests SET status = $1 WHERE id = $2', ['completed', s.request_id]);
+            await promoteNextSchedule(client, s.room_id, { date: today, start_time: '00:00', end_time: '23:59' });
+            await client.query('COMMIT');
+        } catch (_err) {
+            await client.query('ROLLBACK').catch(() => {});
+        } finally {
+            client.release();
+        }
+    }
 }
 
 async function hasOverlap(client, roomId, date, startTime, endTime) {
@@ -332,7 +394,24 @@ app.get('/health', async (_req, res) => {
     }
 });
 
-app.post('/api/auth/login', async (req, res, next) => {
+// Auth-gated HTML routes — must come before express.static
+app.get('/html/AdminDashboard.html', requireAuthHtml, (req, res) => {
+    res.sendFile(path.join(__dirname, 'html', 'AdminDashboard.html'));
+});
+app.get('/html/InstructorDashboard.html', requireAuthHtml, (req, res) => {
+    res.sendFile(path.join(__dirname, 'html', 'InstructorDashboard.html'));
+});
+
+app.use(express.static(path.join(__dirname), {
+    setHeaders: (res, filePath) => {
+        if (filePath.endsWith('.html')) {
+            res.setHeader('Content-Type', 'text/html; charset=utf-8');
+        }
+        res.setHeader('Cache-Control', 'no-cache');
+    }
+}));
+
+app.post('/api/auth/login', loginLimiter, async (req, res, next) => {
     try {
         const username = String(req.body.username || '').trim().toLowerCase();
         const password = String(req.body.password || '');
@@ -349,7 +428,28 @@ app.post('/api/auth/login', async (req, res, next) => {
     }
 });
 
-app.post('/api/auth/register', async (req, res, next) => {
+app.post('/api/auth/reset-password', requireAuth, async (req, res, next) => {
+    try {
+        const currentPassword = String(req.body.currentPassword || '');
+        const newPassword = String(req.body.newPassword || '');
+        if (!currentPassword || !newPassword || newPassword.length < 6) {
+            return res.status(400).json({ error: 'Current password and new password (min 6 chars) are required.' });
+        }
+        const db = requireDb();
+        const { rows } = await db.query('SELECT * FROM users WHERE id = $1', [req.user.id]);
+        const user = rows[0];
+        if (!user || !(await bcrypt.compare(currentPassword, user.password_hash))) {
+            return res.status(401).json({ error: 'Current password is incorrect.' });
+        }
+        const newHash = await bcrypt.hash(newPassword, 12);
+        await db.query('UPDATE users SET password_hash = $1, updated_at = now() WHERE id = $2', [newHash, req.user.id]);
+        res.json({ ok: true });
+    } catch (error) {
+        next(error);
+    }
+});
+
+app.post('/api/auth/register', registerLimiter, async (req, res, next) => {
     const client = await requireDb().connect();
     try {
         const username = String(req.body.username || '').trim().toLowerCase();
@@ -406,6 +506,15 @@ app.get('/api/auth/me', requireAuth, async (req, res, next) => {
 app.get('/api/data', authOptional, async (req, res, next) => {
     try {
         res.json(await buildSnapshot(req.user));
+    } catch (error) {
+        next(error);
+    }
+});
+
+app.delete('/api/logs', requireAuth, requireRole('admin'), async (req, res, next) => {
+    try {
+        await requireDb().query('DELETE FROM system_logs');
+        res.json({ ok: true });
     } catch (error) {
         next(error);
     }
@@ -500,6 +609,25 @@ app.delete('/api/registration-codes/:id', requireAuth, requireRole('admin'), asy
     }
 });
 
+app.post('/api/admin/users/:id/reset-password', requireAuth, requireRole('admin'), async (req, res, next) => {
+    try {
+        const newPassword = String(req.body.newPassword || '');
+        if (!newPassword || newPassword.length < 6) {
+            return res.status(400).json({ error: 'New password must be at least 6 characters.' });
+        }
+        const newHash = await bcrypt.hash(newPassword, 12);
+        const { rowCount } = await requireDb().query(
+            'UPDATE users SET password_hash = $1, updated_at = now() WHERE id = $2',
+            [newHash, req.params.id]
+        );
+        if (rowCount === 0) return res.status(404).json({ error: 'User not found.' });
+        await addLog(requireDb(), req.user.id, 'user_password_reset', null, { targetUserId: req.params.id });
+        res.json({ ok: true });
+    } catch (error) {
+        next(error);
+    }
+});
+
 app.post('/api/admin/users', requireAuth, requireRole('admin'), async (req, res, next) => {
     try {
         const username = String(req.body.username || '').trim().toLowerCase();
@@ -523,53 +651,103 @@ app.post('/api/admin/users', requireAuth, requireRole('admin'), async (req, res,
     }
 });
 
+app.patch('/api/users/me', requireAuth, async (req, res, next) => {
+    try {
+        const fullName = String(req.body.fullName || '').trim();
+        const email = String(req.body.email || '').trim() || null;
+        if (!fullName) return res.status(400).json({ error: 'Full name is required.' });
+        const { rows } = await requireDb().query(
+            'UPDATE users SET full_name = $1, email = $2, updated_at = now() WHERE id = $3 RETURNING *',
+            [fullName, email, req.user.id]
+        );
+        res.json({ user: publicUser(rows[0]) });
+    } catch (error) {
+        next(error);
+    }
+});
+
 app.post('/api/requests', requireAuth, requireRole('instructor'), async (req, res, next) => {
     const client = await requireDb().connect();
     try {
         const date = String(req.body.date || '');
         const startTime = String(req.body.startTime || '');
         const endTime = String(req.body.endTime || '');
-        const today = manilaToday();
-        if (date !== today) return res.status(400).json({ error: `Schedules are only allowed for today (${today}).` });
-        if (!startTime || !endTime || startTime >= endTime) return res.status(400).json({ error: 'Invalid time range.' });
+        if (!date || !startTime || !endTime || startTime >= endTime) {
+            return res.status(400).json({ error: 'Invalid date or time range.' });
+        }
+        if (date < manilaToday()) {
+            return res.status(400).json({ error: 'Cannot request a room for a past date.' });
+        }
 
         await client.query('BEGIN');
         const roomResult = await client.query('SELECT * FROM rooms WHERE room_number = $1 FOR UPDATE', [Number(req.body.roomId)]);
         const room = roomResult.rows[0];
-        if (!room) {
+        if (!room) { await client.query('ROLLBACK'); return res.status(404).json({ error: 'Room not found.' }); }
+        if (!room.is_requestable) { await client.query('ROLLBACK'); return res.status(409).json({ error: 'This room is not available for requests.' }); }
+
+        const { rows: dupRows } = await client.query(`
+            SELECT id, start_time, end_time FROM room_requests
+            WHERE instructor_id = $1 AND room_id = $2 AND date = $3
+              AND status IN ('pending','active','standby')
+              AND start_time < $5 AND end_time > $4
+            LIMIT 1
+        `, [req.user.id, room.id, date, startTime, endTime]);
+        if (dupRows[0]) {
             await client.query('ROLLBACK');
-            return res.status(404).json({ error: 'Room not found.' });
-        }
-        if (!room.is_requestable) {
-            await client.query('ROLLBACK');
-            return res.status(409).json({ error: 'This room is not available for instructor requests.' });
+            return res.status(409).json({ error: `You already have a request for this room on ${date} at ${dupRows[0].start_time?.slice(0,5)}–${dupRows[0].end_time?.slice(0,5)}.` });
         }
 
-        const overlaps = await hasOverlap(client, room.id, date, startTime, endTime);
-        const status = overlaps ? 'standby' : 'active';
-        const queuePosition = overlaps ? await nextQueuePosition(client, room.id, date) : null;
         const requestedStatus = req.body.requestedStatus || 'locked';
-        const requestResult = await client.query(`
-            INSERT INTO room_requests (
-                room_id, instructor_id, date, start_time, end_time, purpose,
-                requested_status, status, queue_position, decided_at
-            )
-            VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, now())
+        const { rows } = await client.query(`
+            INSERT INTO room_requests (room_id, instructor_id, date, start_time, end_time, purpose, requested_status, status)
+            VALUES ($1, $2, $3, $4, $5, $6, $7, 'pending')
             RETURNING *
-        `, [room.id, req.user.id, date, startTime, endTime, req.body.purpose || null, requestedStatus, status, queuePosition]);
-        await client.query(`
-            INSERT INTO room_schedules (
-                request_id, room_id, instructor_id, date, start_time, end_time,
-                requested_status, status, queue_position
-            )
-            VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)
-        `, [requestResult.rows[0].id, room.id, req.user.id, date, startTime, endTime, requestedStatus, status, queuePosition]);
-        if (status === 'active') {
-            await client.query('UPDATE rooms SET status = $1, updated_at = now() WHERE id = $2', [STATUS_MAP[requestedStatus] || 'Available', room.id]);
-        }
-        await addLog(client, req.user.id, 'request_create', room.id, { status, date, startTime, endTime, requestedStatus });
+        `, [room.id, req.user.id, date, startTime, endTime, req.body.purpose || null, requestedStatus]);
+
+        await addLog(client, req.user.id, 'request_create', room.id, { date, startTime, endTime, requestedStatus });
         await client.query('COMMIT');
-        res.status(201).json({ request: requestResult.rows[0], status });
+        res.status(201).json({ request: rows[0], status: 'pending' });
+    } catch (error) {
+        await client.query('ROLLBACK').catch(() => {});
+        next(error);
+    } finally {
+        client.release();
+    }
+});
+
+app.post('/api/requests/:id/approve', requireAuth, requireRole('admin'), async (req, res, next) => {
+    const client = await requireDb().connect();
+    try {
+        await client.query('BEGIN');
+        const { rows: reqRows } = await client.query(`
+            SELECT rr.*, rm.room_number FROM room_requests rr
+            JOIN rooms rm ON rm.id = rr.room_id
+            WHERE rr.id = $1 AND rr.status = 'pending'
+            FOR UPDATE
+        `, [req.params.id]);
+        const request = reqRows[0];
+        if (!request) { await client.query('ROLLBACK'); return res.status(404).json({ error: 'Pending request not found.' }); }
+
+        const overlaps = await hasOverlap(client, request.room_id, request.date, request.start_time, request.end_time);
+        const status = overlaps ? 'standby' : 'active';
+        const queuePosition = overlaps ? await nextQueuePosition(client, request.room_id, request.date) : null;
+
+        await client.query(`
+            UPDATE room_requests SET status = $1, queue_position = $2, decided_at = now(), decided_by = $3 WHERE id = $4
+        `, [status, queuePosition, req.user.id, request.id]);
+
+        await client.query(`
+            INSERT INTO room_schedules (request_id, room_id, instructor_id, date, start_time, end_time, requested_status, status, queue_position)
+            VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)
+        `, [request.id, request.room_id, request.instructor_id, request.date, request.start_time, request.end_time, request.requested_status, status, queuePosition]);
+
+        if (status === 'active' && dbDate(request.date) === manilaToday()) {
+            await client.query('UPDATE rooms SET status = $1, updated_at = now() WHERE id = $2', [STATUS_MAP[request.requested_status] || 'Locked', request.room_id]);
+        }
+
+        await addLog(client, req.user.id, 'request_approve', request.room_id, { requestId: request.id, status });
+        await client.query('COMMIT');
+        res.json({ ok: true, status });
     } catch (error) {
         await client.query('ROLLBACK').catch(() => {});
         next(error);
@@ -583,7 +761,7 @@ app.patch('/api/requests/:id/reject', requireAuth, requireRole('admin'), async (
         const { rows } = await requireDb().query(`
             UPDATE room_requests
             SET status = 'rejected', decided_at = now(), decided_by = $2, rejection_reason = $3
-            WHERE id = $1 AND status IN ('active', 'standby')
+            WHERE id = $1 AND status IN ('pending', 'active', 'standby')
             RETURNING *
         `, [req.params.id, req.user.id, req.body.reason || null]);
         if (!rows[0]) return res.status(404).json({ error: 'Request not found or already closed.' });
@@ -599,10 +777,9 @@ app.delete('/api/requests/:id', requireAuth, async (req, res, next) => {
     try {
         await client.query('BEGIN');
         const { rows } = await client.query(`
-            SELECT rr.*, s.id AS schedule_id, s.status AS schedule_status
-            FROM room_requests rr
-            LEFT JOIN room_schedules s ON s.request_id = rr.id
-            WHERE rr.id = $1
+            SELECT *
+            FROM room_requests
+            WHERE id = $1
             FOR UPDATE
         `, [req.params.id]);
         const request = rows[0];
@@ -614,9 +791,20 @@ app.delete('/api/requests/:id', requireAuth, async (req, res, next) => {
             await client.query('ROLLBACK');
             return res.status(403).json({ error: 'Forbidden' });
         }
+        if (req.user.role !== 'admin' && !['pending','completed','rejected','cancelled'].includes(request.status)) {
+            await client.query('ROLLBACK');
+            return res.status(409).json({ error: 'Only pending requests can be cancelled. Contact admin for active bookings.' });
+        }
+        const scheduleResult = await client.query(`
+            UPDATE room_schedules
+            SET status = $1
+            WHERE request_id = $2
+            RETURNING *
+        `, ['cancelled', req.params.id]);
         await client.query('UPDATE room_requests SET status = $1 WHERE id = $2', ['cancelled', req.params.id]);
-        await client.query('UPDATE room_schedules SET status = $1 WHERE request_id = $2', ['cancelled', req.params.id]);
-        if (request.schedule_status === 'active') {
+
+        const schedule = scheduleResult.rows[0];
+        if (schedule?.status === 'active') {
             await promoteNextSchedule(client, request.room_id, request);
         }
         await client.query('COMMIT');
@@ -675,6 +863,11 @@ app.use((error, _req, res, _next) => {
 if (require.main === module) {
     if (!DATABASE_URL) {
         console.warn('DATABASE_URL is not configured. API routes will return 503 until it is set.');
+    }
+    if (pool) {
+        setInterval(() => {
+            autoCompleteExpiredSessions(pool).catch(() => {});
+        }, 60 * 1000);
     }
     app.listen(PORT, '0.0.0.0', () => {
         console.log(`CTU Room Management System running on port ${PORT}`);

@@ -12,6 +12,11 @@ function renderMonitoringTable() {
 
     if (!tbody) return;
 
+    // Preserve active filters before re-render
+    const savedSearch = document.getElementById('monitorSearch')?.value || '';
+    const savedDate   = document.getElementById('monitorDateFilter')?.value || '';
+    if (!window._scheduleFilter) window._scheduleFilter = 'now';
+
     // Get register type rooms with schedules (not schedule type duplicates)
     // Show all schedules (past, present, and future)
     const scheduledRooms = allRooms.filter(r =>
@@ -55,37 +60,109 @@ function renderMonitoringTable() {
         }
     });
 
-    tbody.innerHTML = allRows.map((row, idx) => {
-        const statusClass = row.room.status.toLowerCase();
-        const formattedDate = formatDate(row.schedule.date);
-        const duration = calculateDuration(row.schedule.startTime, row.schedule.endTime);
-        const queueIndicator = row.totalInQueue > 1 ?
-            `<span style="color: #c0392b; font-weight: bold;">[${row.queuePosition}/${row.totalInQueue}]</span>` : '';
-        const statusBadge = row.schedule.queueStatus === 'standby' ?
-            '<span style="color: #ff9800; font-weight: bold;">⏳ Standby</span>' :
-            '<span style="color: #27ae60; font-weight: bold;">✓ Active</span>';
+    // Apply filters pre-pagination
+    const search      = (document.getElementById('monitorSearch')?.value || '').toLowerCase().trim();
+    const dateFilter  = document.getElementById('monitorDateFilter')?.value || '';
+    const activeFilter = window._scheduleFilter || 'now';
 
-        // Check if schedule is in the future
+    const today = new Date().toISOString().split('T')[0];
+    const nowMinutes = new Date().getHours() * 60 + new Date().getMinutes();
+
+    allRows = allRows.filter(row => {
+        const s = row.schedule;
+        const d = s.date || '';
+
+        // Time filter
+        let matchTime = true;
+        if (activeFilter === 'now') {
+            const [sh, sm] = (s.startTime || '00:00').split(':').map(Number);
+            const [eh, em] = (s.endTime   || '23:59').split(':').map(Number);
+            matchTime = d === today && (sh * 60 + sm) <= nowMinutes && nowMinutes <= (eh * 60 + em);
+        } else if (activeFilter === 'today') {
+            matchTime = d === today;
+        } else if (activeFilter === 'upcoming') {
+            const [sh, sm] = (s.startTime || '00:00').split(':').map(Number);
+            matchTime = d > today || (d === today && (sh * 60 + sm) > nowMinutes);
+        } else if (activeFilter === 'date') {
+            matchTime = !dateFilter || d === dateFilter;
+        }
+        // 'all' = no time filter
+
+        // Search filter
+        let matchSearch = true;
+        if (search) {
+            if (/^\d+$/.test(search)) {
+                matchSearch = row.room.id.toString() === search;
+            } else {
+                matchSearch = (s.instructor || '').toLowerCase().includes(search)
+                    || row.room.category.toLowerCase().includes(search)
+                    || getInstructorFullName(s.instructor).toLowerCase().includes(search);
+            }
+        }
+
+        return matchTime && matchSearch;
+    });
+
+    const totalRows = allRows.length;
+    const schedPage = (typeof pageState !== 'undefined' ? pageState.schedule : 1) || 1;
+    const schedPageSize = typeof PAGE_SIZE !== 'undefined' ? PAGE_SIZE : 10;
+    allRows = allRows.slice((schedPage - 1) * schedPageSize, schedPage * schedPageSize);
+
+    tbody.innerHTML = allRows.map((row) => {
+        const duration = calculateDuration(row.schedule.startTime, row.schedule.endTime);
+        const isActive  = row.schedule.queueStatus === 'active';
+        const isStandby = row.schedule.queueStatus === 'standby';
         const today = new Date().toISOString().split('T')[0];
-        const isFutureSchedule = row.schedule.date > today;
+        const isToday  = row.schedule.date === today;
+        const isPast   = row.schedule.date < today;
+
+        const queueBadge = isActive
+            ? '<span style="background:#27ae60;color:white;padding:3px 10px;border-radius:12px;font-size:0.78rem;font-weight:700;">✓ Active</span>'
+            : isStandby
+            ? `<span style="background:#f39c12;color:white;padding:3px 10px;border-radius:12px;font-size:0.78rem;font-weight:700;">⏳ Queue #${row.queuePosition}</span>`
+            : '';
+
+        const dateLabel = isPast ? `<span style="color:#e74c3c;">${row.schedule.date} (past)</span>`
+            : isToday ? `<span style="color:#27ae60;font-weight:600;">Today</span>`
+            : `<span>${row.schedule.date}</span>`;
+
+        const roomIndex = allRooms.findIndex(r => r.id === row.room.id);
+
+        const actions = `
+            <div style="display:flex;gap:6px;flex-wrap:wrap;">
+                ${isActive && isToday ? `<button class="btn-complete" onclick="openCompleteSessionModal(${roomIndex})">✓ Done</button>` : ''}
+                <button class="btn-danger-outline" onclick="removeFutureSchedule(${row.room.id}, '${row.schedule.date}', '${row.schedule.startTime}', '${row.schedule.endTime}', '${row.schedule.instructor}')">Remove</button>
+            </div>`;
 
         return `
-        <tr style="${row.isFirst ? '' : 'background: #f9f9f9;'}" data-date="${row.schedule.date}" data-status="${row.room.status}" data-instructor="${row.schedule.instructor.toLowerCase()}" data-category="${row.room.category.toLowerCase()}" data-room="${row.room.id}">
-            <td><strong>${row.room.id}</strong></td>
-            <td>${queueIndicator} ${getInstructorFullName(row.schedule.instructor)}</td>
-            <td>${row.room.category}</td>
-            <td class="monitor-date">${formattedDate}</td>
-            <td class="monitor-time">${row.schedule.startTime || '--:--'}</td>
-            <td class="monitor-time">${row.schedule.endTime || '--:--'}</td>
-            <td><span class="duration-badge">${duration}</span></td>
+        <tr data-date="${row.schedule.date}" data-status="${row.room.status}" data-instructor="${(row.schedule.instructor || '').toLowerCase()}" data-category="${row.room.category.toLowerCase()}" data-room="${row.room.id}">
             <td>
-                <span class="monitor-status ${statusClass}">${row.room.status}</span>
-                ${statusBadge}
-                <button class="btn-view-queue" onclick="viewRoomQueue(${row.room.id}, '${row.schedule.date}')" style="margin-left: 8px; padding: 4px 8px; font-size: 11px;">View Schedule</button>
-                ${isFutureSchedule ? `<button class="btn-remove-schedule" onclick="removeFutureSchedule(${row.room.id}, '${row.schedule.date}', '${row.schedule.startTime}', '${row.schedule.endTime}', '${row.schedule.instructor}')" style="margin-left: 8px; padding: 4px 8px; font-size: 11px; background: #e74c3c; color: white; border: none; border-radius: 3px; cursor: pointer;">✗ Remove</button>` : ''}
+                <strong style="color:var(--primary);">Room ${row.room.id}</strong>
+                <div style="font-size:0.8rem;color:#888;">${row.room.category}</div>
             </td>
+            <td>
+                <span style="font-weight:600;">${getInstructorFullName(row.schedule.instructor)}</span>
+                ${row.totalInQueue > 1 ? `<div style="font-size:0.78rem;color:#888;">${row.totalInQueue} in queue</div>` : ''}
+            </td>
+            <td>
+                ${dateLabel}
+                <div style="font-size:0.85rem;color:#555;">${row.schedule.startTime || '--:--'} – ${row.schedule.endTime || '--:--'}</div>
+            </td>
+            <td><span class="duration-badge">${duration}</span></td>
+            <td>${queueBadge}</td>
+            <td>${actions}</td>
         </tr>`;
     }).join('');
+
+    if (typeof renderPagination === 'function') {
+        renderPagination('schedulePagination', totalRows, schedPage, 'goSchedulePage');
+    }
+
+    // Restore search/date input values
+    const srch = document.getElementById('monitorSearch');
+    const dt   = document.getElementById('monitorDateFilter');
+    if (srch && savedSearch) srch.value = savedSearch;
+    if (dt   && savedDate)   dt.value   = savedDate;
 
     updateMonitoringStats();
 }
@@ -93,7 +170,36 @@ function renderMonitoringTable() {
 /**
  * Filter monitoring table
  */
+function setScheduleFilter(filter) {
+    window._scheduleFilter = filter;
+    // Update active button
+    ['now','today','upcoming','all'].forEach(f => {
+        const btn = document.getElementById('schedFilter' + f.charAt(0).toUpperCase() + f.slice(1));
+        if (btn) btn.classList.toggle('active', f === filter);
+    });
+    // Clear date picker unless using date filter
+    if (filter !== 'date') {
+        const d = document.getElementById('monitorDateFilter');
+        if (d) d.value = '';
+    }
+    pageState.schedule = 1;
+    renderMonitoringTable();
+}
+
 function filterMonitoring() {
+    pageState.schedule = 1;
+    renderMonitoringTable();
+}
+
+function clearScheduleFilters() {
+    const s = document.getElementById('monitorSearch');
+    const d = document.getElementById('monitorDateFilter');
+    if (s) s.value = '';
+    if (d) d.value = '';
+    setScheduleFilter('now');
+}
+
+function filterMonitoring_DOM_UNUSED() {
     const searchInput = document.getElementById('monitorSearch');
     const dateInput = document.getElementById('monitorDateFilter');
     const statusInput = document.getElementById('monitorStatusFilter');
@@ -150,19 +256,21 @@ function updateMonitoringStats() {
     const totalEl = document.getElementById('totalScheduled');
     const todayEl = document.getElementById('activeToday');
 
-    if (!totalEl || !todayEl) return;
-
-    // Count rooms with schedules (register type with schedules array)
-    const scheduledRooms = allRooms.filter(r => r.type === 'register' && r.schedules && r.schedules.length > 0);
-    totalEl.innerText = scheduledRooms.length;
-
     const today = new Date().toISOString().split('T')[0];
-    const activeToday = allRooms.filter(r =>
-        r.type === 'register' &&
-        r.schedules &&
-        r.schedules.some(s => s.date === today)
-    ).length;
-    todayEl.innerText = activeToday;
+    const scheduledRooms = allRooms.filter(r => r.type === 'register' && r.schedules && r.schedules.length > 0);
+    const activeToday = allRooms.reduce((count, r) => {
+        if (!r.schedules) return count;
+        return count + r.schedules.filter(s => s.date === today && s.queueStatus === 'active').length;
+    }, 0);
+
+    if (totalEl) totalEl.innerText = scheduledRooms.length;
+    if (todayEl) todayEl.innerText = activeToday;
+
+    const badge = document.getElementById('navBadgeSchedule');
+    if (badge) {
+        badge.textContent = activeToday;
+        badge.classList.toggle('show', activeToday > 0);
+    }
 }
 
 /**
@@ -213,8 +321,8 @@ function viewRoomQueue(roomId, date) {
                                     </span>
                                 </div>
                                 <div style="font-size: 12px; color: #666;">
-                                    <p style="margin: 4px 0;">Purpose: ${schedule.purpose || 'Schedule'}</p>
-                                    <p style="margin: 4px 0;">Status: ${schedule.requestedStatus || 'Scheduled'}</p>
+                                    <p style="margin: 4px 0;">Purpose: ${escapeHtml(schedule.purpose || 'Schedule')}</p>
+                                    <p style="margin: 4px 0;">Status: ${escapeHtml(schedule.requestedStatus || 'Scheduled')}</p>
                                 </div>
                             </div>
                         `).join('')
@@ -248,62 +356,41 @@ function closeRoomQueueModal() {
  * @param {string} endTime - End time
  * @param {string} instructor - Instructor name
  */
-function removeFutureSchedule(roomId, date, startTime, endTime, instructor) {
+async function removeFutureSchedule(roomId, date, startTime, endTime, instructor) {
     const instructorFullName = getInstructorFullName(instructor);
-    if (!confirm(`Are you sure you want to remove the schedule for Room ${roomId} on ${formatDate(date)} (${startTime} - ${endTime}) by ${instructorFullName}? This will mark the instructor's request as rejected.`)) {
+    if (!await showConfirm(`Remove schedule for Room ${roomId} on ${formatDate(date)} (${startTime} - ${endTime}) by ${instructorFullName}? The instructor's request will be rejected.`)) {
         return;
     }
 
-    // Find the room
     const room = allRooms.find(r => r.id === roomId);
     if (!room || !room.schedules) {
-        alert('Room or schedule not found!');
+        showToast('Room or schedule not found.', 'error');
         return;
     }
 
-    // Find and remove the specific schedule
-    const scheduleIndex = room.schedules.findIndex(s =>
+    const schedule = room.schedules.find(s =>
         s.date === date &&
         s.startTime === startTime &&
         s.endTime === endTime &&
         s.instructor === instructor
     );
 
-    if (scheduleIndex === -1) {
-        alert('Schedule not found!');
+    if (!schedule) {
+        showToast('Schedule not found.', 'error');
         return;
     }
 
-    // Remove the schedule
-    room.schedules.splice(scheduleIndex, 1);
-
-    // Find the corresponding pending request and mark it as rejected
-    const request = pendingRequests.find(r =>
-        r.roomId === roomId &&
-        r.date === date &&
-        r.startTime === startTime &&
-        r.endTime === endTime &&
-        r.instructor === instructor &&
-        r.status === 'approved'
-    );
-
-    if (request) {
-        request.status = 'rejected';
-        // Save to database
-        pushToServer();
+    try {
+        if (schedule.requestId) {
+            await apiFetch(`/api/requests/${schedule.requestId}`, { method: 'DELETE' });
+        } else {
+            await apiFetch(`/api/schedules/${schedule.id}/cancel`, { method: 'POST', body: '{}' });
+        }
+        await refreshData({ render: true });
+        showToast('Schedule removed. The instructor\'s request has been rejected.', 'success');
+    } catch (error) {
+        showToast(error.message, 'error');
     }
-
-    // Save changes
-    pushToServer();
-
-    // Re-render the monitoring table
-    renderMonitoringTable();
-
-    // Update stats
-    updateStatusCounts();
-    updateRequestsSidebar();
-
-    alert('Schedule removed successfully. The instructor\'s request has been marked as rejected.');
 }
 
 // Export for use in other modules

@@ -2,6 +2,16 @@
    CTU Room Management System - Helpers Module
    ============================================ */
 
+function escapeHtml(str) {
+    if (str == null) return '';
+    return String(str)
+        .replace(/&/g, '&amp;')
+        .replace(/</g, '&lt;')
+        .replace(/>/g, '&gt;')
+        .replace(/"/g, '&quot;')
+        .replace(/'/g, '&#39;');
+}
+
 /**
  * Convert time string to minutes
  * @param {string} timeStr - Time in "HH:MM" format
@@ -112,10 +122,10 @@ function checkTimeConflict(room, date, startTime, endTime) {
         }
     }
 
-    // Check against approved pending requests
-    const existingRequests = pendingRequests.filter(r =>
+    // Check against active or standby API request rows.
+    const existingRequests = roomRequests.filter(r =>
         r.roomId === room.id &&
-        r.status === 'approved' &&
+        ['active', 'standby'].includes(r.status) &&
         r.date === date
     );
 
@@ -162,24 +172,26 @@ function checkDuplicateSchedule(roomId, date, startTime, endTime) {
  * Start the system clock
  */
 function startClock() {
-    // Update immediately instead of waiting for interval
     const updateClock = () => {
-        const now = new Date().toLocaleTimeString();
-        const clockElements = document.querySelectorAll('.system-time');
-        clockElements.forEach(el => {
-            el.innerText = now;
-        });
+        const now = new Date();
+        const timeStr = now.toLocaleTimeString('en-PH', { hour: '2-digit', minute: '2-digit', second: '2-digit', hour12: true });
 
-        // Update notifications if function exists
-        if (typeof updateScheduleNotifications === 'function') {
-            updateScheduleNotifications();
-        }
+        document.querySelectorAll('.system-time').forEach(el => { el.innerText = timeStr; });
+
+        const adminClock = document.getElementById('adminClock');
+        if (adminClock) adminClock.textContent = timeStr;
+
+        const instrClock = document.getElementById('instructorClock');
+        if (instrClock) instrClock.textContent = timeStr;
+
+        // Put date + time together in the date label
+        const dateLabel = document.getElementById('instrDateLabel');
+        if (dateLabel) dateLabel.textContent = now.toLocaleDateString('en-PH', { weekday: 'long', month: 'long', day: 'numeric', year: 'numeric' });
+
+        if (typeof updateScheduleNotifications === 'function') updateScheduleNotifications();
     };
 
-    // Call immediately on load
     updateClock();
-
-    // Then update every second
     setInterval(updateClock, 1000);
 }
 

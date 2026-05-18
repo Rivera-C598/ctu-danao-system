@@ -42,6 +42,7 @@ data.json.old
 tmp/
 temp/
 *.tmp
+notes
 
 # Build outputs
 dist/

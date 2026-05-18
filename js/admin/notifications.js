@@ -158,9 +158,9 @@ function getScheduleManagementHtml() {
                     <div class="schedule-management-item ${index === 0 ? 'current-schedule' : 'queued-schedule'}">
                         <div>
                             <div style="font-weight: 700;">${index === 0 ? 'Current Instructor' : `#${index + 1} in queue`}</div>
-                            <div>${schedule.instructor}</div>
-                            <div style="font-size: 0.88rem; color: #666;">${schedule.startTime} - ${schedule.endTime}</div>
-                            <div style="font-size: 0.82rem; color: #666; margin-top: 4px;">${schedule.purpose || 'Schedule'}</div>
+                            <div>${escapeHtml(schedule.instructor)}</div>
+                            <div style="font-size: 0.88rem; color: #666;">${escapeHtml(schedule.startTime)} - ${escapeHtml(schedule.endTime)}</div>
+                            <div style="font-size: 0.82rem; color: #666; margin-top: 4px;">${escapeHtml(schedule.purpose || 'Schedule')}</div>
                         </div>
                         <button class="btn-remove-schedule" onclick="removeScheduleEntry(${room.id}, '${room.date}', '${schedule.startTime}')">✖</button>
                     </div>
@@ -170,11 +170,11 @@ function getScheduleManagementHtml() {
     }).join('');
 }
 
-function removeScheduleEntry(roomId, date, startTime) {
+async function removeScheduleEntry(roomId, date, startTime) {
     const room = allRooms.find(r => r.type === 'schedule' && r.id === roomId && r.date === date);
     if (!room) return;
 
-    if (!confirm('Are you sure you want to remove this schedule entry?\nThis will promote the next instructor in queue if one exists.')) {
+    if (!await showConfirm('Are you sure you want to remove this schedule entry?\nThis will promote the next instructor in queue if one exists.')) {
         return;
     }
 

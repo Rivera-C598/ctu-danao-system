@@ -2,73 +2,127 @@
 CTU Room Management System - Instructor Dashboard
 ============================================ */
 
-// Current instructor tab
-let currentInstructorTab = 'available';
+let currentInstructorTab = 'myschedules';
 let selectedRoomForRequest = null;
 
-/**
- * Initialize instructor view
- */
 function initInstructorView() {
     const session = getSession();
     if (session) {
-        // Update desktop profile with full name
-        document.getElementById('instructorName').textContent = session.fullName || session.username;
-        // Update mobile profile with username
-        document.getElementById('mobileInstructorUsername').textContent = session.username || 'Instructor';
+        const name = session.fullName || session.username;
+        const el = document.getElementById('instructorName');
+        const mobileEl = document.getElementById('mobileInstructorUsername');
+        const avatarEl = document.getElementById('instructorAvatar');
+        const mobileAvatar = document.getElementById('mobileInstructorAvatar');
+        if (el) el.textContent = name;
+        if (mobileEl) mobileEl.textContent = name;
+        if (avatarEl) avatarEl.textContent = name[0]?.toUpperCase() || 'I';
+        if (mobileAvatar) mobileAvatar.textContent = name[0]?.toUpperCase() || '👤';
     }
-
-    renderInstructorAvailableRooms();
+    switchInstructorTab('myschedules');
     updateInstructorStats();
-
-    // Set default room filter to 'all'
-    const filterSelect = document.getElementById('mobileRoomFilter');
-    if (filterSelect) {
-        filterSelect.value = 'all';
-    }
+    if (typeof startClock === 'function') startClock();
 }
 
-/**
- * Switch instructor tab
- * @param {string} tab - Tab name ('available', 'myschedules', 'requests')
- */
 function switchInstructorTab(tab) {
     currentInstructorTab = tab;
 
-    // Update mobile bottom nav active state
-    document.querySelectorAll('.nav-btn').forEach(btn => btn.classList.remove('active'));
-    document.querySelectorAll('.menu-btn').forEach(btn => btn.classList.remove('active'));
+    document.querySelectorAll('.nav-btn').forEach(b => b.classList.remove('active'));
+    document.querySelectorAll('.menu-btn').forEach(b => b.classList.remove('active'));
 
-    // Find the correct button based on tab
-    let activeBtn;
-    if (tab === 'available') {
-        activeBtn = document.querySelector('.nav-btn:first-child') || document.querySelector('.menu-btn:first-child');
-    } else if (tab === 'myschedules') {
-        activeBtn = document.querySelector('.nav-btn:nth-child(2)') || document.querySelector('.menu-btn:nth-child(2)');
-    } else if (tab === 'requests') {
-        activeBtn = document.querySelector('.nav-btn:nth-child(3)') || document.querySelector('.menu-btn:nth-child(3)');
-    }
+    ['mySchedulesTab','requestsTab','historyTab'].forEach(id => {
+        const el = document.getElementById(id);
+        if (el) el.style.display = 'none';
+    });
+    const fab = document.getElementById('floatingRequestBtn');
+    if (fab) fab.style.display = 'none';
 
-    if (activeBtn) {
-        activeBtn.classList.add('active');
-    }
-
-    // Hide all tabs
-    document.getElementById('availableTab').style.display = 'none';
-    document.getElementById('mySchedulesTab').style.display = 'none';
-    document.getElementById('requestsTab').style.display = 'none';
-
-    // Show selected tab
-    if (tab === 'available') {
-        document.getElementById('availableTab').style.display = 'block';
-        renderInstructorAvailableRooms();
-    } else if (tab === 'myschedules') {
+    if (tab === 'myschedules') {
         document.getElementById('mySchedulesTab').style.display = 'block';
+        document.getElementById('navBtnSchedule')?.classList.add('active');
+        document.getElementById('menuBtnSchedule')?.classList.add('active');
         renderMySchedules();
     } else if (tab === 'requests') {
         document.getElementById('requestsTab').style.display = 'block';
+        document.getElementById('navBtnRequests')?.classList.add('active');
+        document.getElementById('menuBtnRequests')?.classList.add('active');
         renderMyRequests();
+    } else if (tab === 'history') {
+        document.getElementById('historyTab').style.display = 'block';
+        document.getElementById('navBtnHistory')?.classList.add('active');
+        document.getElementById('menuBtnHistory')?.classList.add('active');
+        renderMyHistory();
     }
+}
+
+/* ── Room Picker Sheet ── */
+function openRoomPicker() {
+    const sheet = document.getElementById('roomPickerSheet');
+    if (sheet) {
+        sheet.style.display = 'flex';
+        renderRoomPickerList('');
+        const input = document.getElementById('roomPickerSearch');
+        if (input) { input.value = ''; setTimeout(() => input.focus(), 100); }
+    }
+}
+
+function closeRoomPicker() {
+    const sheet = document.getElementById('roomPickerSheet');
+    if (sheet) sheet.style.display = 'none';
+}
+
+function filterRoomPicker(query) {
+    renderRoomPickerList(query);
+}
+
+function renderRoomPickerList(query) {
+    const list = document.getElementById('roomPickerList');
+    if (!list) return;
+    const q = (query || '').toLowerCase().trim();
+
+    const rooms = allRooms.filter(r => r.type !== 'schedule' && r.isRequestable !== false);
+    const filtered = rooms.filter(r => {
+        if (!q) return true;
+        return r.id.toString() === q || r.category.toLowerCase().includes(q);
+    });
+
+    if (filtered.length === 0) {
+        list.innerHTML = '<p style="text-align:center;color:#999;padding:20px;">No rooms found.</p>';
+        return;
+    }
+
+    list.innerHTML = filtered.map(room => {
+        const statusColor = {
+            Available: 'var(--green,#27ae60)',
+            Locked: 'var(--red,#c0392b)',
+            Meeting: 'var(--purple,#7b3fa0)',
+            Maintenance: 'var(--orange,#d4680a)'
+        }[room.status] || '#999';
+
+        const queueCount = room.schedules?.length || 0;
+
+        return `
+        <div onclick="event.stopPropagation();selectRoomFromPicker(${room.id})" style="display:flex;align-items:center;justify-content:space-between;padding:14px 4px;border-bottom:1px solid var(--border,#f0f0f0);cursor:pointer;gap:12px;">
+            <div>
+                <div style="font-weight:700;font-size:14px;">Room ${room.id}</div>
+                <div style="font-size:12px;color:#888;">${room.category}</div>
+                ${queueCount > 0 ? `<div style="font-size:11px;color:#f39c12;">${queueCount} in queue</div>` : ''}
+            </div>
+            <span style="background:${statusColor};color:white;padding:4px 10px;border-radius:12px;font-size:11px;font-weight:700;white-space:nowrap;">${room.status}</span>
+        </div>`;
+    }).join('');
+}
+
+function selectRoomFromPicker(roomId) {
+    event.stopPropagation();
+    closeRoomPicker();
+    setTimeout(() => {
+        try {
+            openRequestModal(roomId);
+        } catch (err) {
+            console.error('openRequestModal failed:', err);
+            showToast('Error: ' + err.message, 'error');
+        }
+    }, 50);
 }
 
 /**
@@ -77,6 +131,7 @@ function switchInstructorTab(tab) {
 function renderInstructorAvailableRooms() {
     const grid = document.getElementById('availableRoomsGrid');
     const noData = document.getElementById('noAvailableRooms');
+    if (!grid) return; // element removed in new layout
 
     // Get all 'register' type rooms (skip 'schedule' duplicates)
     const displayRooms = allRooms.filter(room =>
@@ -92,7 +147,7 @@ function renderInstructorAvailableRooms() {
 
     noData.style.display = 'none';
 
-    grid.innerHTML = displayRooms.map(room => {
+    const newHTML = displayRooms.map(room => {
         const hasSchedules = room.schedules && room.schedules.length > 0;
         const isScheduled = hasSchedules;
         const hasConflict = isScheduled && checkTimeConflict(room);
@@ -156,7 +211,7 @@ function renderInstructorAvailableRooms() {
                 
                 <div class="room-actions">
                     <button class="btn-request" onclick="openRequestModal(${room.id})" ${hasConflict ? 'disabled' : ''}>
-                        Request your Schedule
+                        ${isScheduled ? '⏳ Join Queue' : 'Request Schedule'}
                     </button>
                     <button class="btn-view-schedule" onclick="viewRoomSchedule(${room.id})">
                         View Schedule
@@ -164,6 +219,9 @@ function renderInstructorAvailableRooms() {
                 </div>
             </div>`;
     }).join('');
+
+    // Only update DOM if content actually changed — prevents flicker on poll
+    if (grid.innerHTML !== newHTML) grid.innerHTML = newHTML;
 }
 
 /**
@@ -248,11 +306,11 @@ function renderScheduleTimeline(roomId) {
         // New format: schedules array
         daySchedules = room.schedules;
     } else {
-        // Legacy format: check pendingRequests
-        daySchedules = pendingRequests.filter(req =>
+        // API request rows include active/standby schedule records.
+        daySchedules = roomRequests.filter(req =>
             req.roomId === roomId &&
             req.date === dateStr &&
-            req.status === 'approved'
+            ['active', 'standby'].includes(req.status)
         ).map(req => ({
             instructor: req.instructor,
             startTime: req.startTime,
@@ -279,8 +337,8 @@ function renderScheduleTimeline(roomId) {
             </div>
             <div class="schedule-details">
                 ${index === 0 ? '<span style="color: #27ae60; font-weight: 600; font-size: 11px;">🟢 CURRENT</span>' : ''}
-                <span class="schedule-instructor">👤 ${schedule.instructor}</span>
-                <span class="schedule-purpose">${schedule.purpose || 'No description'}</span>
+                <span class="schedule-instructor">👤 ${escapeHtml(schedule.instructor)}</span>
+                <span class="schedule-purpose">${escapeHtml(schedule.purpose || 'No description')}</span>
             </div>
         </div>
     `).join('');
@@ -319,7 +377,7 @@ function viewRoomSchedule(roomId) {
                     </div>
                     <div class="date-picker">
                         <label>Year</label>
-                        <input type="number" class="date-input" id="viewScheduleYear" min="2026" value="${today.getFullYear()}">
+                        <input type="number" class="date-input" id="viewScheduleYear" min="${today.getFullYear()}" value="${today.getFullYear()}">
                     </div>
                     <button class="btn-search-schedule" onclick="renderScheduleTimeline(${roomId})">Show Schedule</button>
                 </div>
@@ -349,48 +407,6 @@ function closeViewScheduleModal() {
     }
 }
 
-/**
- * Render schedule timeline for selected date
- * @param {number} roomId - Room ID
- */
-function renderScheduleTimeline(roomId) {
-    const day = document.getElementById('viewScheduleDay').value;
-    const month = String(document.getElementById('viewScheduleMonth').value).padStart(2, '0');
-    const year = document.getElementById('viewScheduleYear').value;
-    const dateStr = `${year}-${month}-${String(day).padStart(2, '0')}`;
-
-    const timeline = document.getElementById('scheduleTimeline');
-    const noData = document.getElementById('noScheduleMessage');
-
-    // Get all schedules for this room on the selected date
-    const daySchedules = pendingRequests.filter(req =>
-        req.roomId === roomId &&
-        req.date === dateStr &&
-        req.status === 'approved'
-    ).sort((a, b) => a.startTime.localeCompare(b.startTime));
-
-    if (daySchedules.length === 0) {
-        timeline.innerHTML = '';
-        noData.style.display = 'block';
-        return;
-    }
-
-    noData.style.display = 'none';
-
-    timeline.innerHTML = daySchedules.map((schedule, index) => `
-        <div class="schedule-timeline-item">
-            <div class="schedule-time">
-                <span class="time-block">${schedule.startTime}</span>
-                <span class="time-separator">→</span>
-                <span class="time-block">${schedule.endTime}</span>
-            </div>
-            <div class="schedule-details">
-                <span class="schedule-instructor">👤 ${schedule.instructor}</span>
-                <span class="schedule-purpose">${schedule.purpose || 'No description'}</span>
-            </div>
-        </div>
-    `).join('');
-}
 
 /**
  * Open profile modal for editing user information
@@ -452,25 +468,28 @@ function closeProfileModal() {
 /**
  * Save profile changes
  */
-function saveProfile() {
-    const name = document.getElementById('profileName').value;
-    const email = document.getElementById('profileEmail').value;
-    const department = document.getElementById('profileDepartment').value;
-
-    // Update session storage
-    const session = getSession();
-    if (session) {
-        session.fullName = name;
-        session.email = email;
-        session.department = department;
-        saveSession(session);
-
-        // Update UI
-        document.getElementById('instructorName').textContent = name;
-        document.getElementById('mobileInstructorName').textContent = name;
-
+async function saveProfile() {
+    const name = document.getElementById('profileName').value.trim();
+    const email = document.getElementById('profileEmail').value.trim();
+    if (!name) return;
+    try {
+        const result = await apiFetch('/api/users/me', {
+            method: 'PATCH',
+            body: JSON.stringify({ fullName: name, email: email || null })
+        });
+        const session = getSession();
+        if (session) {
+            session.fullName = result.user.fullName;
+            session.email = result.user.email;
+            saveSession(session);
+        }
+        document.getElementById('instructorName').textContent = result.user.fullName;
+        const mobileNameEl = document.getElementById('mobileInstructorName');
+        if (mobileNameEl) mobileNameEl.textContent = result.user.fullName;
         showNotification('Profile Updated', 'Your profile has been updated successfully', 'success', 3000);
         closeProfileModal();
+    } catch (error) {
+        showToast(error.message, 'error');
     }
 }
 
@@ -481,10 +500,10 @@ function toggleNotifications() {
     const session = getSession();
     if (!session) return;
 
-    // Get user's pending and approved requests
-    const myRequests = pendingRequests.filter(r => r.instructor === session.username);
-    const pending = myRequests.filter(r => r.status === 'pending');
-    const approved = myRequests.filter(r => r.status === 'approved');
+    // Get user's standby and active requests.
+    const myRequests = roomRequests.filter(r => r.instructor === session.username);
+    const pending = myRequests.filter(r => r.status === 'standby');
+    const approved = myRequests.filter(r => r.status === 'active');
 
     let message = '';
 
@@ -520,9 +539,9 @@ function updateInstructorStats() {
     const session = getSession();
     if (!session) return;
 
-    const myRequests = pendingRequests.filter(r => r.instructor === session.username);
+    const myRequests = roomRequests.filter(r => r.instructor === session.username);
     const today = new Date().toISOString().split('T')[0];
-    const pending = myRequests.filter(r => r.status === 'pending').length;
+    const pending = myRequests.filter(r => r.status === 'standby').length;
 
     const activeSchedules = [];
     allRooms.forEach(room => {
@@ -537,10 +556,11 @@ function updateInstructorStats() {
 
     const approved = activeSchedules.length;
 
-    document.getElementById('instTotalRequests').textContent = myRequests.length;
-    document.getElementById('instApprovedCount').textContent = approved;
-    document.getElementById('myScheduleCount').textContent = approved;
-    document.getElementById('pendingRequestCount').textContent = pending;
+    const safe = (id, val) => { const el = document.getElementById(id); if (el) el.textContent = val; };
+    safe('instTotalRequests', myRequests.length);
+    safe('instApprovedCount', approved);
+    safe('myScheduleCount', approved);
+    safe('pendingRequestCount', pending);
 
     // Update mobile badges
     const pendingBadge = document.getElementById('pendingBadge');
@@ -564,7 +584,7 @@ function updateNotificationBadge() {
     const session = getSession();
     if (!session) return;
 
-    const pendingCount = pendingRequests.filter(r => r.instructor === session.username && r.status === 'pending').length;
+    const pendingCount = roomRequests.filter(r => r.instructor === session.username && r.status === 'standby').length;
     const notificationBadge = document.getElementById('notificationBadge');
 
     if (notificationBadge) {

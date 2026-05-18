@@ -11,6 +11,7 @@ const CATEGORIES = ["Comlab Room", "Machine Room", "Library Room", "Office Room"
 let allRooms = [];
 let systemLogs = [];
 let scheduleStatus = {};
+let roomRequests = [];
 let pendingRequests = [];
 let usersDatabase = [];
 let registrationCodes = [];
@@ -46,22 +47,87 @@ async function apiFetch(url, options = {}) {
     return payload;
 }
 
+let _lastDataHash = null;
+
+function _dataHash(data) {
+    // Fast fingerprint — lengths + last item ids + statuses
+    const rooms = (data.allRooms || []);
+    const reqs  = (data.roomRequests || data.pendingRequests || []);
+    const logs  = (data.systemLogs || []);
+    return [
+        rooms.length,
+        rooms.map(r => r.status).join(','),
+        reqs.length,
+        reqs.filter(r => r.status === 'pending').length,
+        reqs.filter(r => r.status === 'active').length,
+        logs.length,
+        (data.registrationCodes || []).length
+    ].join('|');
+}
+
 function applyServerData(data) {
+    const prevRequests = roomRequests || [];
     allRooms = data.allRooms || [];
     systemLogs = data.systemLogs || [];
     scheduleStatus = data.scheduleStatus || {};
-    pendingRequests = data.pendingRequests || [];
+    roomRequests = data.roomRequests || data.pendingRequests || [];
+    pendingRequests = roomRequests;
     usersDatabase = data.usersDatabase || [];
     registrationCodes = data.registrationCodes || [];
     notifications = data.notifications || [];
     isConnected = true;
+
+    // Notify admin of new pending requests
+    if (typeof showNotification === 'function' && prevRequests.length > 0) {
+        const session = typeof getSession === 'function' ? getSession() : null;
+        if (session?.role === 'admin') {
+            const prevPendingIds = new Set(prevRequests.filter(r => r.status === 'pending').map(r => r.id));
+            const newPending = (roomRequests || []).filter(r => r.status === 'pending' && !prevPendingIds.has(r.id));
+            if (newPending.length > 0) {
+                const r = newPending[0];
+                showNotification(
+                    `New Request${newPending.length > 1 ? ` (+${newPending.length})` : ''}`,
+                    `${r.instructorName || r.instructor} requested Room ${r.roomId} on ${r.date}`,
+                    'info', 6000
+                );
+                // Pulse the nav badge
+                const badge = document.getElementById('navBadgeRequests');
+                if (badge) {
+                    badge.style.animation = 'none';
+                    setTimeout(() => badge.style.animation = '', 10);
+                }
+            }
+        }
+    }
+
+    // Notify instructor of request status changes
+    if (typeof showNotification === 'function' && prevRequests.length > 0) {
+        const session = typeof getSession === 'function' ? getSession() : null;
+        if (session?.role === 'instructor') {
+            roomRequests.forEach(r => {
+                const prev = prevRequests.find(p => p.id === r.id);
+                if (!prev || prev.status === r.status) return;
+                if (r.instructor !== session.username) return;
+                if (r.status === 'active') {
+                    showNotification('Room Approved!', `Room ${r.roomId} on ${r.date} has been approved.`, 'success', 6000);
+                } else if (r.status === 'standby') {
+                    showNotification('Added to Queue', `Room ${r.roomId} request is queued — waiting for current session to end.`, 'info', 5000);
+                } else if (r.status === 'rejected') {
+                    showNotification('Request Rejected', `Room ${r.roomId} on ${r.date} was rejected.${r.rejectionReason ? ' Reason: ' + r.rejectionReason : ''}`, 'warning', 7000);
+                }
+            });
+        }
+    }
 }
 
-async function refreshData({ render = true } = {}) {
+async function refreshData({ render = true, force = false } = {}) {
     try {
         const data = await apiFetch('/api/data');
+        const hash = _dataHash(data);
+        const changed = force || hash !== _lastDataHash;
+        _lastDataHash = hash;
         applyServerData(data);
-        if (render) refreshUI();
+        if (render && changed) refreshUI();
         return data;
     } catch (error) {
         isConnected = false;
@@ -85,7 +151,7 @@ function initSync() {
         refreshData({ render: true }).catch((error) => {
             console.warn('Polling sync failed:', error.message);
         });
-    }, 5000);
+    }, 15000);
 }
 
 function stopSync() {
@@ -102,10 +168,12 @@ function refreshUI() {
     if (typeof updateStatusCounts === 'function') updateStatusCounts();
     if (typeof updateScheduleNotifications === 'function') updateScheduleNotifications();
     if (typeof renderRegistrationCodes === 'function') renderRegistrationCodes();
+    if (typeof checkAndAutoApproveQueue === 'function') checkAndAutoApproveQueue();
 
     if (typeof renderInstructorAvailableRooms === 'function') renderInstructorAvailableRooms();
     if (typeof renderMySchedules === 'function') renderMySchedules();
     if (typeof renderMyRequests === 'function') renderMyRequests();
+    if (typeof renderMyHistory === 'function') renderMyHistory();
     if (typeof updateInstructorStats === 'function') updateInstructorStats();
 }
 
@@ -156,6 +224,7 @@ function exportData() {
         logs: systemLogs,
         scheduleStatus,
         requests: pendingRequests,
+        roomRequests,
         users: usersDatabase,
         registrationCodes
     };
@@ -179,6 +248,7 @@ if (typeof module !== 'undefined' && module.exports) {
         systemLogs,
         scheduleStatus,
         pendingRequests,
+        roomRequests,
         usersDatabase,
         saveToStorage,
         saveUsersDatabase,
