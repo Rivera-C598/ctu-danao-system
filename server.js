@@ -702,6 +702,20 @@ app.delete('/api/registration-codes/:id', requireAuth, requireRole('admin'), asy
     }
 });
 
+app.patch('/api/admin/users/:id', requireAuth, requireRole('admin'), async (req, res, next) => {
+    try {
+        const fullName = String(req.body.fullName || '').trim();
+        const email    = String(req.body.email    || '').trim() || null;
+        if (!fullName) return res.status(400).json({ error: 'Full name is required.' });
+        const { rows } = await requireDb().query(
+            'UPDATE users SET full_name=$1, email=$2, updated_at=now() WHERE id=$3 RETURNING *',
+            [fullName, email, req.params.id]
+        );
+        if (!rows[0]) return res.status(404).json({ error: 'User not found.' });
+        res.json({ user: publicUser(rows[0]) });
+    } catch (error) { next(error); }
+});
+
 app.delete('/api/admin/users/:id', requireAuth, requireRole('admin'), async (req, res, next) => {
     try {
         if (req.params.id === req.user.id) return res.status(400).json({ error: 'Cannot delete your own account.' });

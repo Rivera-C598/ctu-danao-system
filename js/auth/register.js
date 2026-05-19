@@ -195,7 +195,6 @@ async function performRegistration() {
     const username = document.getElementById('regUsername').value.trim().toLowerCase();
     const fullName = document.getElementById('regFullName').value.trim();
     const email = document.getElementById('regEmail').value.trim();
-    const phoneNumber = document.getElementById('regPhoneNumber').value.trim();
     const registrationCode = document.getElementById('regCode') ? document.getElementById('regCode').value.trim() : '';
     const password = document.getElementById('regPassword').value;
     const messageEl = document.getElementById('registerMessage');
@@ -203,12 +202,6 @@ async function performRegistration() {
     // Final validation checks
     if (!isUsernameAvailable) {
         messageEl.textContent = 'Please choose a different username';
-        messageEl.className = 'register-message error';
-        return;
-    }
-
-    if (!phoneNumber) {
-        messageEl.textContent = 'Phone number is required for account recovery';
         messageEl.className = 'register-message error';
         return;
     }
@@ -222,7 +215,7 @@ async function performRegistration() {
     try {
         await apiFetch('/api/auth/register', {
             method: 'POST',
-            body: JSON.stringify({ username, password, fullName, email: email || null, phoneNumber, registrationCode })
+            body: JSON.stringify({ username, password, fullName, email: email || null, registrationCode })
         });
         messageEl.innerHTML = `✓ Account created successfully! Welcome, <strong>${fullName}</strong>! Redirecting to login...`;
         messageEl.className = 'register-message success';

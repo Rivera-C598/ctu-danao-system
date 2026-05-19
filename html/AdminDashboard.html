@@ -395,6 +395,10 @@
 
                 <!-- Instructors table -->
                 <div class="requests-table-wrapper">
+                    <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:12px;">
+                        <h3 style="margin:0;font-size:1rem;color:var(--primary);">🎓 Instructor Accounts</h3>
+                        <button class="btn-action-primary" onclick="openAddUserModal()">+ Add Instructor</button>
+                    </div>
                     <table id="usersTable" class="admin-table">
                         <thead>
                             <tr>
@@ -507,6 +511,42 @@
             </div>
             <div id="requestDetailBody" style="padding:22px;"></div>
             <div id="requestDetailFooter" style="display:flex;gap:10px;padding:16px 22px;border-top:1px solid #eee;"></div>
+        </div>
+    </div>
+
+    <!-- ADD USER MODAL -->
+    <div id="addUserModal" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,0.5);z-index:3000;align-items:center;justify-content:center;" onclick="if(event.target===this)closeAddUserModal()">
+        <div style="background:white;border-radius:14px;max-width:420px;width:90%;box-shadow:0 8px 40px rgba(0,0,0,0.2);overflow:hidden;">
+            <div style="background:var(--primary);color:white;padding:18px 22px;display:flex;justify-content:space-between;align-items:center;">
+                <h3 style="margin:0;font-size:1rem;font-weight:700;" id="userModalTitle">Add Instructor</h3>
+                <button onclick="closeAddUserModal()" style="background:rgba(255,255,255,0.2);border:none;color:white;width:28px;height:28px;border-radius:50%;cursor:pointer;font-size:16px;">×</button>
+            </div>
+            <div style="padding:22px;">
+                <input type="hidden" id="editUserId">
+                <div class="form-group">
+                    <label>Username *</label>
+                    <input type="text" id="modalUsername" placeholder="e.g. jsmith" autocomplete="off">
+                </div>
+                <div class="form-group">
+                    <label>Full Name *</label>
+                    <input type="text" id="modalFullName" placeholder="John Smith">
+                </div>
+                <div class="form-group">
+                    <label>Email</label>
+                    <input type="email" id="modalEmail" placeholder="optional">
+                </div>
+                <div id="modalPasswordSection">
+                    <div class="form-group">
+                        <label>Password *</label>
+                        <input type="password" id="modalPassword" placeholder="Min 6 characters">
+                    </div>
+                </div>
+                <div id="userModalMsg" style="display:none;font-size:0.82rem;padding:8px 12px;border-radius:8px;margin-top:4px;"></div>
+            </div>
+            <div style="display:flex;gap:10px;padding:0 22px 18px;">
+                <button onclick="closeAddUserModal()" style="flex:1;padding:10px;border:1.5px solid #ddd;background:white;border-radius:8px;cursor:pointer;font-weight:600;">Cancel</button>
+                <button onclick="saveUser()" style="flex:1;padding:10px;border:none;background:var(--primary);color:white;border-radius:8px;cursor:pointer;font-weight:700;" id="saveUserBtn">Add Instructor</button>
+            </div>
         </div>
     </div>
 

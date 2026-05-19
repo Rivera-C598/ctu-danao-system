@@ -825,12 +825,66 @@ function renderUsersTable() {
             <td>${lastLogin}</td>
             <td><span style="font-weight:600;">${u.loginCount || 0}</span></td>
             <td style="display:flex;gap:6px;flex-wrap:wrap;">
-                <button class="btn-outline-action" onclick="adminResetPassword('${u.id}', '${u.username}')">Reset Password</button>
+                <button class="btn-outline-action" style="font-size:0.78rem;padding:5px 10px;" onclick="editUser('${u.id}')">Edit</button>
+                <button class="btn-outline-action" onclick="adminResetPassword('${u.id}', '${u.username}')">Reset PW</button>
                 <button class="btn-danger-outline" style="font-size:0.78rem;padding:5px 10px;" onclick="adminDeleteUser('${u.id}', '${u.fullName||u.username}')">Delete</button>
             </td>
         </tr>`;
     }).join('');
     renderPagination('usersPagination', totalUsers, usrPage, 'goUsersPage');
+}
+
+function editUser(userId) {
+    const u = usersDatabase.find(x => x.id === userId);
+    if (u) openAddUserModal(u);
+}
+
+function openAddUserModal(user) {
+    const isEdit = !!user;
+    document.getElementById('userModalTitle').textContent = isEdit ? 'Edit Instructor' : 'Add Instructor';
+    document.getElementById('saveUserBtn').textContent = isEdit ? 'Save Changes' : 'Add Instructor';
+    document.getElementById('editUserId').value = isEdit ? user.id : '';
+    document.getElementById('modalUsername').value = isEdit ? (user.username || '') : '';
+    document.getElementById('modalUsername').disabled = isEdit;
+    document.getElementById('modalFullName').value = isEdit ? (user.fullName || '') : '';
+    document.getElementById('modalEmail').value = isEdit ? (user.email || '') : '';
+    document.getElementById('modalPassword').value = '';
+    document.getElementById('modalPasswordSection').style.display = isEdit ? 'none' : 'block';
+    const msg = document.getElementById('userModalMsg');
+    if (msg) msg.style.display = 'none';
+    document.getElementById('addUserModal').style.display = 'flex';
+}
+
+function closeAddUserModal() {
+    document.getElementById('addUserModal').style.display = 'none';
+}
+
+async function saveUser() {
+    const id       = document.getElementById('editUserId').value;
+    const isEdit   = !!id;
+    const fullName = document.getElementById('modalFullName').value.trim();
+    const email    = document.getElementById('modalEmail').value.trim();
+    const username = document.getElementById('modalUsername').value.trim().toLowerCase();
+    const password = document.getElementById('modalPassword').value;
+    const msg = document.getElementById('userModalMsg');
+    const setMsg = (text, ok) => {
+        if (!msg) return;
+        msg.textContent = text;
+        msg.style.cssText = `display:block;background:rgba(${ok?'39,174,96':'231,76,60'},0.1);color:rgb(${ok?'39,174,96':'231,76,60'});font-size:0.82rem;padding:8px 12px;border-radius:8px;margin-top:4px;`;
+    };
+    if (!fullName) { setMsg('Full name is required.', false); return; }
+    if (!isEdit && (!username || username.length < 3)) { setMsg('Username must be at least 3 characters.', false); return; }
+    if (!isEdit && password.length < 6) { setMsg('Password must be at least 6 characters.', false); return; }
+    try {
+        if (isEdit) {
+            await apiFetch(`/api/admin/users/${id}`, { method: 'PATCH', body: JSON.stringify({ fullName, email: email || null }) });
+        } else {
+            await apiFetch('/api/admin/users', { method: 'POST', body: JSON.stringify({ username, fullName, email: email || null, password, role: 'instructor' }) });
+        }
+        await refreshData({ render: true, force: true });
+        setMsg(isEdit ? '✓ Updated!' : '✓ Instructor added!', true);
+        setTimeout(closeAddUserModal, 800);
+    } catch (error) { setMsg(error.message, false); }
 }
 
 async function adminDeleteUser(userId, name) {
