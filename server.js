@@ -4,6 +4,11 @@ const express = require('express');
 const path = require('path');
 const fs = require('fs');
 const multer = require('multer');
+const { createClient } = require('@supabase/supabase-js');
+
+const supabase = process.env.SUPABASE_URL && process.env.SUPABASE_SERVICE_KEY
+    ? createClient(process.env.SUPABASE_URL, process.env.SUPABASE_SERVICE_KEY)
+    : null;
 const bcrypt = require('bcrypt');
 const jwt = require('jsonwebtoken');
 const cookieParser = require('cookie-parser');
@@ -405,14 +410,16 @@ app.get('/html/InstructorDashboard.html', requireAuthHtml, (req, res) => {
     res.sendFile(path.join(__dirname, 'html', 'InstructorDashboard.html'));
 });
 
-app.use(express.static(path.join(__dirname), {
+const staticOpts = {
     setHeaders: (res, filePath) => {
-        if (filePath.endsWith('.html')) {
-            res.setHeader('Content-Type', 'text/html; charset=utf-8');
-        }
+        if (filePath.endsWith('.html')) res.setHeader('Content-Type', 'text/html; charset=utf-8');
         res.setHeader('Cache-Control', 'no-cache');
     }
-}));
+};
+// Serve only safe public directories — never expose server.js, .env, node_modules
+['js', 'css', 'assets', 'html', 'public'].forEach(dir => {
+    app.use(`/${dir}`, express.static(path.join(__dirname, dir), staticOpts));
+});
 
 app.post('/api/auth/login', loginLimiter, async (req, res, next) => {
     try {
@@ -444,16 +451,10 @@ app.patch('/api/auth/profile', requireAuth, async (req, res, next) => {
     } catch (error) { next(error); }
 });
 
-const avatarStorage = multer.diskStorage({
-    destination: path.join(__dirname, 'public', 'avatars'),
-    filename: (req, file, cb) => {
-        const ext = path.extname(file.originalname).toLowerCase() || '.jpg';
-        cb(null, `${req.user.id}${ext}`);
-    }
-});
+// Use memory storage — file goes to Supabase Storage, not disk
 const avatarUpload = multer({
-    storage: avatarStorage,
-    limits: { fileSize: 2 * 1024 * 1024 }, // 2MB
+    storage: multer.memoryStorage(),
+    limits: { fileSize: 2 * 1024 * 1024 },
     fileFilter: (_req, file, cb) => {
         if (!file.mimetype.startsWith('image/')) return cb(new Error('Images only.'));
         cb(null, true);
@@ -468,7 +469,23 @@ app.post('/api/auth/avatar', requireAuth, (req, res, next) => {
 }, async (req, res, next) => {
     try {
         if (!req.file) return res.status(400).json({ error: 'No file uploaded.' });
-        const avatarUrl = `/public/avatars/${req.file.filename}`;
+        if (!supabase) return res.status(503).json({ error: 'Storage not configured (SUPABASE_URL/SUPABASE_SERVICE_KEY missing).' });
+
+        const ext = req.file.mimetype.includes('png') ? 'png' : req.file.mimetype.includes('gif') ? 'gif' : 'jpg';
+        const filename = `${req.user.id}.${ext}`;
+
+        const { error: uploadError } = await supabase.storage
+            .from('avatars')
+            .upload(filename, req.file.buffer, {
+                contentType: req.file.mimetype,
+                upsert: true  // overwrite existing
+            });
+
+        if (uploadError) return res.status(500).json({ error: uploadError.message });
+
+        const { data } = supabase.storage.from('avatars').getPublicUrl(filename);
+        const avatarUrl = data.publicUrl;
+
         await requireDb().query('UPDATE users SET avatar_url=$1, updated_at=now() WHERE id=$2', [avatarUrl, req.user.id]);
         res.json({ avatarUrl });
     } catch (error) {
