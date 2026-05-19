@@ -50,12 +50,8 @@
         <header class="mobile-top-header">
             <div class="mobile-header-top">
                 <div class="mobile-profile-section">
-                    <div class="mobile-profile-avatar" id="mobileInstructorAvatar" onclick="openProfileModal()">👤</div>
+                    <div class="mobile-profile-avatar" id="mobileInstructorAvatar" onclick="openProfileModal()" style="cursor:pointer;" title="View profile">👤</div>
                     <span class="mobile-profile-username" id="mobileInstructorUsername">Instructor</span>
-                </div>
-                <div class="mobile-clock-area">
-                    <span id="instrDateLabel" class="mobile-date-label"></span>
-                    <span id="instructorClock" class="mobile-clock"></span>
                 </div>
             </div>
         </header>
@@ -116,9 +112,10 @@
             <!-- MY SCHEDULES TAB -->
             <div id="mySchedulesTab" class="instructor-tab-panel">
 
-                <!-- Clock bar (mobile visible) -->
-                <div class="clock-bar mobile-clock-bar">
-                    <span id="instrDateLabelMobile" class="date-label"></span>
+                <!-- Clock bar -->
+                <div style="display:flex;justify-content:space-between;align-items:center;padding:10px 4px 14px;border-bottom:1px solid var(--border,rgba(255,255,255,0.08));margin-bottom:14px;">
+                    <span id="instrDateLabel" style="font-size:0.78rem;opacity:0.55;"></span>
+                    <span id="instructorClock" style="font-size:1.05rem;font-weight:700;color:var(--red,#c0392b);font-variant-numeric:tabular-nums;"></span>
                 </div>
 
                 <!-- Empty state -->
@@ -169,6 +166,71 @@
                 <div id="historyList" class="requests-list"></div>
             </div>
 
+            <!-- SETTINGS TAB -->
+            <div id="settingsTab" class="instructor-tab-panel" style="display:none;">
+                <!-- Profile card -->
+                <div style="background:var(--surface,#fff);border-radius:16px;padding:24px;margin-bottom:14px;border:1px solid var(--border,#f0f0f0);">
+                    <div style="display:flex;align-items:center;gap:16px;">
+                        <div style="position:relative;flex-shrink:0;">
+                            <div id="settingsAvatar" style="width:64px;height:64px;border-radius:50%;background:#c0392b;color:white;display:flex;align-items:center;justify-content:center;font-weight:800;font-size:22px;overflow:hidden;"></div>
+                            <label title="Change photo" style="position:absolute;bottom:0;right:0;width:22px;height:22px;border-radius:50%;background:#c0392b;color:white;display:flex;align-items:center;justify-content:center;cursor:pointer;font-size:11px;border:2px solid var(--surface,#fff);">
+                                📷<input type="file" accept="image/*" style="display:none;" onchange="uploadAvatar(this)">
+                            </label>
+                        </div>
+                        <div style="flex:1;min-width:0;">
+                            <div id="settingsName" style="font-weight:700;font-size:1rem;"></div>
+                            <div id="settingsUsername" style="font-size:0.8rem;color:#888;"></div>
+                            <div id="settingsEmail" style="font-size:0.8rem;color:#888;margin-top:2px;"></div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Edit profile -->
+                <div style="background:var(--surface,#fff);border-radius:16px;overflow:hidden;margin-bottom:14px;border:1px solid var(--border,#f0f0f0);">
+                    <div style="padding:14px 18px;border-bottom:1px solid var(--border,#f0f0f0);font-weight:700;font-size:0.88rem;color:var(--text,#333);">Edit Profile</div>
+                    <div style="padding:16px 18px;">
+                        <div class="form-group">
+                            <label>Full Name *</label>
+                            <input type="text" id="settingsFullName" placeholder="Your full name">
+                        </div>
+                        <div class="form-group">
+                            <label>Email</label>
+                            <input type="email" id="settingsEmail2" placeholder="your@email.com (optional)">
+                        </div>
+                        <div id="settingsMsg" style="display:none;font-size:0.82rem;padding:8px 12px;border-radius:8px;margin-bottom:10px;"></div>
+                        <button class="btn-submit" onclick="saveSettingsProfile()" style="width:100%;padding:12px;">Save Changes</button>
+                    </div>
+                </div>
+
+                <!-- Change password -->
+                <div style="background:var(--surface,#fff);border-radius:16px;overflow:hidden;margin-bottom:14px;border:1px solid var(--border,#f0f0f0);">
+                    <div style="padding:14px 18px;border-bottom:1px solid var(--border,#f0f0f0);font-weight:700;font-size:0.88rem;color:var(--text,#333);">Change Password</div>
+                    <div style="padding:16px 18px;">
+                        <div class="form-group">
+                            <label>Current Password</label>
+                            <input type="password" id="settingsCurrentPw" placeholder="Enter current password">
+                        </div>
+                        <div class="form-group">
+                            <label>New Password</label>
+                            <input type="password" id="settingsNewPw" placeholder="Min 6 characters">
+                        </div>
+                        <div class="form-group">
+                            <label>Confirm New Password</label>
+                            <input type="password" id="settingsConfirmPw" placeholder="Repeat new password">
+                        </div>
+                        <div id="settingsPwMsg" style="display:none;font-size:0.82rem;padding:8px 12px;border-radius:8px;margin-bottom:10px;"></div>
+                        <button class="btn-submit" onclick="saveSettingsPassword()" style="width:100%;padding:12px;">Update Password</button>
+                    </div>
+                </div>
+
+                <!-- Logout -->
+                <div style="background:var(--surface,#fff);border-radius:16px;overflow:hidden;border:1px solid var(--border,#f0f0f0);">
+                    <button onclick="logout()" style="width:100%;padding:16px 18px;background:transparent;border:none;color:#e74c3c;font-weight:700;font-size:0.95rem;cursor:pointer;text-align:left;font-family:inherit;">
+                        🚪 Logout
+                    </button>
+                </div>
+            </div>
+
         </main>
 
         <!-- Floating Request Button (mobile) -->
@@ -191,9 +253,11 @@
                 <span class="nav-icon">🕐</span>
                 <span class="nav-text">History</span>
             </button>
-            <button class="nav-btn" onclick="logout()">
-                <span class="nav-icon">🚪</span>
-                <span class="nav-text">Logout</span>
+            <button class="nav-btn" id="navBtnSettings" onclick="switchInstructorTab('settings')">
+                <span class="nav-icon" id="navProfileIcon">
+                    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83-2.83l.06-.06A1.65 1.65 0 0 0 4.68 15a1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 2.83-2.83l.06.06A1.65 1.65 0 0 0 9 4.68a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 2.83l-.06.06A1.65 1.65 0 0 0 19.4 9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"/></svg>
+                </span>
+                <span class="nav-text">Settings</span>
             </button>
         </nav>
 
@@ -211,6 +275,40 @@
                     oninput="filterRoomPicker(this.value)">
             </div>
             <div id="roomPickerList" class="room-picker-list"></div>
+        </div>
+    </div>
+
+    <!-- PROFILE MODAL -->
+    <div id="profileModal" class="modal modal-hidden" onclick="if(event.target===this)closeProfileModal()">
+        <div class="modal-content" style="max-width:420px;">
+            <div class="modal-header">
+                <h3>My Profile</h3>
+                <button class="btn-close" onclick="closeProfileModal()">&times;</button>
+            </div>
+            <div class="modal-body">
+                <div style="text-align:center;margin-bottom:20px;">
+                    <div style="position:relative;display:inline-block;">
+                        <div id="profileAvatar" style="width:80px;height:80px;border-radius:50%;background:#c0392b;color:white;display:flex;align-items:center;justify-content:center;font-weight:800;font-size:28px;margin:0 auto;overflow:hidden;"></div>
+                        <label title="Change photo" style="position:absolute;bottom:0;right:0;width:26px;height:26px;border-radius:50%;background:#c0392b;color:white;display:flex;align-items:center;justify-content:center;cursor:pointer;font-size:13px;border:2px solid white;">
+                            📷<input type="file" id="avatarFileInput" accept="image/*" style="display:none;" onchange="uploadAvatar(this)">
+                        </label>
+                    </div>
+                    <div id="profileUsername" style="font-size:0.82rem;color:var(--text-sub,#888);margin-top:8px;">@username</div>
+                </div>
+                <div class="form-group">
+                    <label>Full Name *</label>
+                    <input type="text" id="profileFullName" placeholder="Your full name">
+                </div>
+                <div class="form-group">
+                    <label>Email</label>
+                    <input type="email" id="profileEmail" placeholder="your@email.com (optional)">
+                </div>
+                <div id="profileMsg" style="display:none;font-size:0.82rem;padding:8px 12px;border-radius:8px;margin-top:8px;"></div>
+            </div>
+            <div class="modal-footer">
+                <button class="btn-cancel" onclick="closeProfileModal()">Cancel</button>
+                <button class="btn-submit" onclick="saveProfile()">Save Changes</button>
+            </div>
         </div>
     </div>
 

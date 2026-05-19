@@ -2,6 +2,18 @@
    CTU Room Management System - Admin Requests
    ============================================ */
 
+function _instructorAvatar(req, size = 30) {
+    const name = req.instructorName || getInstructorFullName(req.instructor) || req.instructor || '?';
+    const url  = req.instructorAvatar;
+    const r    = size / 2;
+    const fontSize = Math.round(size * 0.4);
+    if (url) {
+        return `<img src="${url}" style="width:${size}px;height:${size}px;border-radius:50%;object-fit:cover;flex-shrink:0;" onerror="this.style.display='none'">`;
+    }
+    if (typeof avatarHtml === 'function') return avatarHtml(name, size, fontSize);
+    return `<div style="width:${size}px;height:${size}px;border-radius:50%;background:#c0392b;color:white;display:flex;align-items:center;justify-content:center;font-weight:700;font-size:${fontSize}px;flex-shrink:0;">${name[0]?.toUpperCase()||'?'}</div>`;
+}
+
 let _activeRequestFilter = 'pending';
 
 function openRequestDetail(requestId) {
@@ -139,7 +151,12 @@ function renderRequestsTable(filter) {
         return `
         <tr ${clickable} class="${isPending ? 'request-row-pending' : ''}">
             <td style="font-size:0.8rem;color:#888;white-space:nowrap;">${submittedAt}</td>
-            <td>${escapeHtml(req.instructorName || getInstructorFullName(req.instructor))}</td>
+            <td>
+                <div style="display:flex;align-items:center;gap:8px;">
+                    ${_instructorAvatar(req, 30)}
+                    <span>${escapeHtml(req.instructorName || getInstructorFullName(req.instructor))}</span>
+                </div>
+            </td>
             <td><strong>Room ${escapeHtml(req.roomId)}</strong><br><small style="color:#888;">${escapeHtml(req.roomCategory)}</small></td>
             <td>
                 <div style="font-weight:600;">${escapeHtml(req.date)}</div>

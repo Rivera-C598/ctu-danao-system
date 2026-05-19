@@ -197,8 +197,6 @@ async function submitRequest() {
             return newStart < (ee * 60 + em3) && newEnd > (es * 60 + em2);
         })()
     );
-    if (durationMins < 15) { showFormError('Minimum room usage is 15 minutes.'); return; }
-
     if (conflict) {
         const nowM2 = new Date().getHours() * 60 + new Date().getMinutes();
         const [cs, cm] = (conflict.startTime || '').split(':').map(Number);
@@ -214,6 +212,8 @@ async function submitRequest() {
     const [sh, sm2] = startTime.split(':').map(Number);
     const [eh, em] = endTime.split(':').map(Number);
     const durationMins = (eh * 60 + em) - (sh * 60 + sm2);
+    if (durationMins < 15) { showFormError('Minimum room usage is 15 minutes.'); return; }
+
     // Block if overlaps with another instructor's approved booking
     const otherBlock = (roomRequests || []).find(r =>
         (r.instructor || '').toLowerCase().trim() !== (session.username || '').toLowerCase().trim() &&

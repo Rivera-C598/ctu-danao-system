@@ -805,12 +805,16 @@ function renderUsersTable() {
 
     tbody.innerHTML = pagedUsers.map(u => {
         const lastLogin = u.lastLogin ? new Date(u.lastLogin).toLocaleString('en-PH', { dateStyle: 'medium', timeStyle: 'short' }) : '—';
-        const initial = (u.fullName || u.username || '?')[0].toUpperCase();
+        const uName = u.fullName || u.username || '?';
+        const uBg = typeof avatarColor === 'function' ? avatarColor(uName) : 'var(--primary)';
+        const uInitials = typeof avatarInitials === 'function' ? avatarInitials(uName) : uName[0].toUpperCase();
         return `
         <tr>
             <td>
                 <div style="display:flex;align-items:center;gap:10px;">
-                    <div style="width:32px;height:32px;border-radius:50%;background:var(--primary);color:white;display:flex;align-items:center;justify-content:center;font-weight:700;font-size:0.85rem;flex-shrink:0;">${initial}</div>
+                    ${u.avatarUrl
+                        ? `<img src="${u.avatarUrl}" style="width:34px;height:34px;border-radius:50%;object-fit:cover;flex-shrink:0;" onerror="this.style.display='none'">`
+                        : `<div style="width:34px;height:34px;border-radius:50%;background:${uBg};color:white;display:flex;align-items:center;justify-content:center;font-weight:700;font-size:0.85rem;flex-shrink:0;">${uInitials}</div>`}
                     <div>
                         <div style="font-weight:600;">${u.fullName || '—'}</div>
                         <div style="font-size:0.78rem;color:#888;">@${u.username}</div>

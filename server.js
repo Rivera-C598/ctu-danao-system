@@ -3,6 +3,7 @@ require('dotenv').config();
 const express = require('express');
 const path = require('path');
 const fs = require('fs');
+const multer = require('multer');
 const bcrypt = require('bcrypt');
 const jwt = require('jsonwebtoken');
 const cookieParser = require('cookie-parser');
@@ -101,7 +102,8 @@ function publicUser(row) {
         role: row.role,
         loginCount: row.login_count,
         lastLogin: row.last_login_at,
-        createdAt: row.created_at
+        createdAt: row.created_at,
+        avatarUrl: row.avatar_url || null
     };
 }
 
@@ -233,7 +235,7 @@ async function buildSnapshot(user) {
             ORDER BY s.date, s.start_time, COALESCE(s.queue_position, 0)
         `),
         db.query(`
-            SELECT rr.*, rm.room_number, rm.category AS room_category, u.username, u.full_name
+            SELECT rr.*, rm.room_number, rm.category AS room_category, u.username, u.full_name, u.avatar_url
             FROM room_requests rr
             JOIN rooms rm ON rm.id = rr.room_id
             JOIN users u ON u.id = rr.instructor_id
@@ -269,6 +271,7 @@ async function buildSnapshot(user) {
         roomCategory: row.room_category,
         instructor: row.username,
         instructorName: row.full_name,
+        instructorAvatar: row.avatar_url || null,
             date: dbDate(row.date),
         startTime: row.start_time?.slice(0, 5),
         endTime: row.end_time?.slice(0, 5),
@@ -424,6 +427,52 @@ app.post('/api/auth/login', loginLimiter, async (req, res, next) => {
         setAuthCookie(res, signUser(user));
         res.json({ user: publicUser({ ...user, login_count: user.login_count + 1, last_login_at: new Date() }) });
     } catch (error) {
+        next(error);
+    }
+});
+
+app.patch('/api/auth/profile', requireAuth, async (req, res, next) => {
+    try {
+        const fullName = String(req.body.fullName || '').trim();
+        const email    = String(req.body.email    || '').trim() || null;
+        if (!fullName) return res.status(400).json({ error: 'Full name is required.' });
+        const { rows } = await requireDb().query(
+            'UPDATE users SET full_name=$1, email=$2, updated_at=now() WHERE id=$3 RETURNING *',
+            [fullName, email, req.user.id]
+        );
+        res.json({ user: publicUser(rows[0]) });
+    } catch (error) { next(error); }
+});
+
+const avatarStorage = multer.diskStorage({
+    destination: path.join(__dirname, 'public', 'avatars'),
+    filename: (req, file, cb) => {
+        const ext = path.extname(file.originalname).toLowerCase() || '.jpg';
+        cb(null, `${req.user.id}${ext}`);
+    }
+});
+const avatarUpload = multer({
+    storage: avatarStorage,
+    limits: { fileSize: 2 * 1024 * 1024 }, // 2MB
+    fileFilter: (_req, file, cb) => {
+        if (!file.mimetype.startsWith('image/')) return cb(new Error('Images only.'));
+        cb(null, true);
+    }
+});
+
+app.post('/api/auth/avatar', requireAuth, (req, res, next) => {
+    avatarUpload.single('avatar')(req, res, (err) => {
+        if (err) return res.status(400).json({ error: err.message });
+        next();
+    });
+}, async (req, res, next) => {
+    try {
+        if (!req.file) return res.status(400).json({ error: 'No file uploaded.' });
+        const avatarUrl = `/public/avatars/${req.file.filename}`;
+        await requireDb().query('UPDATE users SET avatar_url=$1, updated_at=now() WHERE id=$2', [avatarUrl, req.user.id]);
+        res.json({ avatarUrl });
+    } catch (error) {
+        console.error('Avatar upload error:', error.message);
         next(error);
     }
 });

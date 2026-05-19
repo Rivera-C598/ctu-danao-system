@@ -6,21 +6,188 @@ let currentInstructorTab = 'myschedules';
 let selectedRoomForRequest = null;
 
 function initInstructorView() {
-    const session = getSession();
-    if (session) {
-        const name = session.fullName || session.username;
-        const el = document.getElementById('instructorName');
-        const mobileEl = document.getElementById('mobileInstructorUsername');
-        const avatarEl = document.getElementById('instructorAvatar');
-        const mobileAvatar = document.getElementById('mobileInstructorAvatar');
-        if (el) el.textContent = name;
-        if (mobileEl) mobileEl.textContent = name;
-        if (avatarEl) avatarEl.textContent = name[0]?.toUpperCase() || 'I';
-        if (mobileAvatar) mobileAvatar.textContent = name[0]?.toUpperCase() || '👤';
-    }
+    updateInstructorHeader();
     switchInstructorTab('myschedules');
     updateInstructorStats();
     if (typeof startClock === 'function') startClock();
+}
+
+function updateInstructorHeader() {
+    const session = getSession();
+    if (!session) return;
+    const name = session.fullName || session.username;
+    const el = document.getElementById('instructorName');
+    const mobileEl = document.getElementById('mobileInstructorUsername');
+    const avatarEl = document.getElementById('instructorAvatar');
+    const mobileAvatar = document.getElementById('mobileInstructorAvatar');
+    if (el) el.textContent = name;
+    if (mobileEl) mobileEl.textContent = name;
+    const avatarUrl = session.avatarUrl || null;
+    _setAvatarEl(avatarEl, name, avatarUrl);
+    if (mobileAvatar) {
+        if (avatarUrl) {
+            mobileAvatar.innerHTML = `<img src="${avatarUrl}" style="width:100%;height:100%;object-fit:cover;border-radius:50%;" onerror="this.parentNode.textContent='${name[0]?.toUpperCase()||'?'}'">`;
+            mobileAvatar.style.background = 'transparent';
+        } else {
+            const bg = typeof avatarColor === 'function' ? avatarColor(name) : '#c0392b';
+            mobileAvatar.style.background = bg;
+            mobileAvatar.style.color = 'white';
+            mobileAvatar.style.fontWeight = '700';
+            mobileAvatar.textContent = typeof avatarInitials === 'function' ? avatarInitials(name) : name[0]?.toUpperCase() || '?';
+        }
+    }
+    // navProfileIcon is the gear SVG — don't touch it
+}
+
+function renderSettingsTab() {
+    const session = getSession();
+    if (!session) return;
+    const name = session.fullName || session.username;
+    _setAvatarEl(document.getElementById('settingsAvatar'), name, session.avatarUrl || null);
+    const safe = (id, val) => { const el = document.getElementById(id); if (el) el.textContent = val; };
+    const setVal = (id, val) => { const el = document.getElementById(id); if (el) el.value = val; };
+    safe('settingsName', name);
+    safe('settingsUsername', '@' + session.username);
+    safe('settingsEmail', session.email || '');
+    setVal('settingsFullName', session.fullName || '');
+    setVal('settingsEmail2', session.email || '');
+    const msg = document.getElementById('settingsMsg');
+    if (msg) msg.style.display = 'none';
+}
+
+async function saveSettingsPassword() {
+    const current = document.getElementById('settingsCurrentPw')?.value;
+    const newPw   = document.getElementById('settingsNewPw')?.value;
+    const confirm = document.getElementById('settingsConfirmPw')?.value;
+    const msg     = document.getElementById('settingsPwMsg');
+    const setMsg  = (text, ok) => {
+        if (!msg) return;
+        msg.textContent = text;
+        msg.style.cssText = `display:block;background:rgba(${ok?'39,174,96':'231,76,60'},0.1);color:rgb(${ok?'39,174,96':'231,76,60'});font-size:0.82rem;padding:8px 12px;border-radius:8px;margin-bottom:10px;`;
+    };
+    if (!current || !newPw || !confirm) { setMsg('All password fields are required.', false); return; }
+    if (newPw.length < 6) { setMsg('New password must be at least 6 characters.', false); return; }
+    if (newPw !== confirm) { setMsg('Passwords do not match.', false); return; }
+    try {
+        await apiFetch('/api/auth/reset-password', { method: 'POST', body: JSON.stringify({ currentPassword: current, newPassword: newPw }) });
+        document.getElementById('settingsCurrentPw').value = '';
+        document.getElementById('settingsNewPw').value = '';
+        document.getElementById('settingsConfirmPw').value = '';
+        setMsg('✓ Password updated!', true);
+    } catch (err) { setMsg(err.message, false); }
+}
+
+async function saveSettingsProfile() {
+    const fullName = document.getElementById('settingsFullName')?.value.trim();
+    const email    = document.getElementById('settingsEmail2')?.value.trim();
+    const msg = document.getElementById('settingsMsg');
+    const setMsg = (text, ok) => {
+        if (!msg) return;
+        msg.textContent = text;
+        msg.style.cssText = `display:block;background:rgba(${ok?'39,174,96':'231,76,60'},0.1);color:rgb(${ok?'39,174,96':'231,76,60'});font-size:0.82rem;padding:8px 12px;border-radius:8px;margin-bottom:10px;`;
+    };
+    if (!fullName) { setMsg('Full name is required.', false); return; }
+    try {
+        const result = await apiFetch('/api/auth/profile', { method: 'PATCH', body: JSON.stringify({ fullName, email: email || null }) });
+        const session = getSession();
+        if (session) { session.fullName = result.user.fullName; session.email = result.user.email; saveSession(session); }
+        updateInstructorHeader();
+        renderSettingsTab();
+        setMsg('✓ Profile saved!', true);
+    } catch (err) { setMsg(err.message, false); }
+}
+
+function openProfileModal() {
+    const session = getSession();
+    if (!session) return;
+    const name = session.fullName || session.username;
+    const bg = typeof avatarColor === 'function' ? avatarColor(name) : '#c0392b';
+    const initials = typeof avatarInitials === 'function' ? avatarInitials(name) : name[0]?.toUpperCase() || '?';
+    const av = document.getElementById('profileAvatar');
+    _setAvatarEl(av, name, session.avatarUrl || null);
+    const unEl = document.getElementById('profileUsername');
+    if (unEl) unEl.textContent = '@' + session.username;
+    const fnEl = document.getElementById('profileFullName');
+    if (fnEl) fnEl.value = session.fullName || '';
+    const emEl = document.getElementById('profileEmail');
+    if (emEl) emEl.value = session.email || '';
+    const msg = document.getElementById('profileMsg');
+    if (msg) msg.style.display = 'none';
+    document.getElementById('profileModal')?.classList.remove('modal-hidden');
+}
+
+function closeProfileModal() {
+    document.getElementById('profileModal')?.classList.add('modal-hidden');
+}
+
+function _setAvatarEl(el, name, avatarUrl) {
+    if (!el) return;
+    const bg = typeof avatarColor === 'function' ? avatarColor(name) : '#c0392b';
+    const initials = typeof avatarInitials === 'function' ? avatarInitials(name) : (name[0]?.toUpperCase() || '?');
+    if (avatarUrl) {
+        el.innerHTML = `<img src="${avatarUrl}" style="width:100%;height:100%;object-fit:cover;border-radius:50%;" onerror="this.parentNode.textContent='${initials}'">`;
+        el.style.background = 'transparent';
+    } else {
+        el.innerHTML = initials;
+        el.style.background = bg;
+        el.style.color = 'white';
+    }
+}
+
+async function uploadAvatar(input) {
+    if (!input.files[0]) return;
+    // Find the nearest visible message container
+    const msgId = currentInstructorTab === 'settings' ? 'settingsMsg' : 'profileMsg';
+    const msg = document.getElementById(msgId);
+    const setMsg = (text, ok) => {
+        if (!msg) return;
+        msg.textContent = text;
+        msg.style.cssText = `display:block;background:rgba(${ok?'39,174,96':ok===null?'52,152,219':'231,76,60'},0.1);color:rgb(${ok?'39,174,96':ok===null?'52,152,219':'231,76,60'});font-size:0.82rem;padding:8px 12px;border-radius:8px;margin-top:8px;`;
+    };
+    setMsg('Uploading...', null);
+    const formData = new FormData();
+    formData.append('avatar', input.files[0]);
+    try {
+        const r = await fetch('/api/auth/avatar', { method: 'POST', credentials: 'include', body: formData });
+        const result = await r.json();
+        if (!r.ok || result.error) throw new Error(result.error || `Server error ${r.status}`);
+        const session = getSession();
+        if (session) { session.avatarUrl = result.avatarUrl; saveSession(session); }
+        // Update all avatar elements
+        const name = session?.fullName || session?.username || '';
+        _setAvatarEl(document.getElementById('profileAvatar'), name, result.avatarUrl);
+        _setAvatarEl(document.getElementById('settingsAvatar'), name, result.avatarUrl);
+        updateInstructorHeader();
+        if (currentInstructorTab === 'settings') renderSettingsTab();
+        setMsg('✓ Photo updated!', true);
+    } catch (err) {
+        console.error('Upload error:', err);
+        setMsg(err.message || 'Upload failed.', false);
+    }
+}
+
+async function saveProfile() {
+    const fullName = document.getElementById('profileFullName')?.value.trim();
+    const email    = document.getElementById('profileEmail')?.value.trim();
+    const msg = document.getElementById('profileMsg');
+    if (!fullName) {
+        if (msg) { msg.textContent = 'Full name is required.'; msg.style.cssText = 'display:block;background:rgba(231,76,60,0.1);color:#c0392b;font-size:0.82rem;padding:8px 12px;border-radius:8px;margin-top:8px;'; }
+        return;
+    }
+    try {
+        const result = await apiFetch('/api/auth/profile', {
+            method: 'PATCH',
+            body: JSON.stringify({ fullName, email: email || null })
+        });
+        // Update local session
+        const session = getSession();
+        if (session) { session.fullName = result.user.fullName; session.email = result.user.email; saveSession(session); }
+        updateInstructorHeader();
+        if (msg) { msg.textContent = '✓ Profile updated!'; msg.style.cssText = 'display:block;background:rgba(39,174,96,0.1);color:#27ae60;font-size:0.82rem;padding:8px 12px;border-radius:8px;margin-top:8px;'; }
+        setTimeout(closeProfileModal, 1200);
+    } catch (error) {
+        if (msg) { msg.textContent = error.message; msg.style.cssText = 'display:block;background:rgba(231,76,60,0.1);color:#c0392b;font-size:0.82rem;padding:8px 12px;border-radius:8px;margin-top:8px;'; }
+    }
 }
 
 function switchInstructorTab(tab) {
@@ -29,7 +196,7 @@ function switchInstructorTab(tab) {
     document.querySelectorAll('.nav-btn').forEach(b => b.classList.remove('active'));
     document.querySelectorAll('.menu-btn').forEach(b => b.classList.remove('active'));
 
-    ['mySchedulesTab','requestsTab','historyTab'].forEach(id => {
+    ['mySchedulesTab','requestsTab','historyTab','settingsTab'].forEach(id => {
         const el = document.getElementById(id);
         if (el) el.style.display = 'none';
     });
@@ -52,6 +219,10 @@ function switchInstructorTab(tab) {
         document.getElementById('navBtnHistory')?.classList.add('active');
         document.getElementById('menuBtnHistory')?.classList.add('active');
         renderMyHistory();
+    } else if (tab === 'settings') {
+        document.getElementById('settingsTab').style.display = 'block';
+        document.getElementById('navBtnSettings')?.classList.add('active');
+        renderSettingsTab();
     }
 }
 

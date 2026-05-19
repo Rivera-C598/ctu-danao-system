@@ -2,6 +2,22 @@
    CTU Room Management System - Helpers Module
    ============================================ */
 
+const AVATAR_COLORS = ['#c0392b','#2980b9','#27ae60','#8e44ad','#d4680a','#16a085','#2c3e50','#e91e63'];
+function avatarColor(name) {
+    let h = 0;
+    for (let i = 0; i < (name||'').length; i++) h = (h * 31 + name.charCodeAt(i)) & 0xffffffff;
+    return AVATAR_COLORS[Math.abs(h) % AVATAR_COLORS.length];
+}
+function avatarInitials(name) {
+    const parts = (name||'?').trim().split(/\s+/);
+    return parts.length >= 2 ? (parts[0][0] + parts[parts.length-1][0]).toUpperCase() : (name||'?')[0].toUpperCase();
+}
+function avatarHtml(name, size = 36, fontSize = 14) {
+    const bg = avatarColor(name);
+    const initials = avatarInitials(name);
+    return `<div style="width:${size}px;height:${size}px;border-radius:50%;background:${bg};color:white;display:flex;align-items:center;justify-content:center;font-weight:700;font-size:${fontSize}px;flex-shrink:0;user-select:none;">${initials}</div>`;
+}
+
 function fmt12(timeStr) {
     if (!timeStr) return '—';
     const [h, m] = timeStr.split(':').map(Number);
