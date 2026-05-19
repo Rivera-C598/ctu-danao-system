@@ -467,7 +467,8 @@ function renderMyRequests() {
     const myRequests = (roomRequests || [])
         .filter(r =>
             (r.instructor || '').toLowerCase().trim() === myUsername &&
-            (r.status === 'pending' || ((r.status === 'rejected' || r.status === 'cancelled') && !dismissed[r.id]))
+            (r.status === 'pending' ||
+             ((r.status === 'rejected' || r.status === 'cancelled' || r.status === 'expired') && !dismissed[r.id]))
         )
         .sort((a, b) => new Date(b.requestedAt) - new Date(a.requestedAt));
 
@@ -498,7 +499,8 @@ function renderMyRequests() {
         standby:   '⏳ Approved — In Queue',
         rejected:  '✕ Rejected',
         cancelled: '✕ Cancelled',
-        completed: '✓ Completed'
+        completed: '✓ Completed',
+        expired:   '⌛ Expired'
     };
     const statusClass = {
         pending:   'status-pending',
@@ -510,7 +512,7 @@ function renderMyRequests() {
     };
 
     list.innerHTML = myRequests.map(request => `
-        <div class="request-item ${['rejected','cancelled'].includes(request.status) ? 'rejected' : request.status === 'active' || request.status === 'completed' ? 'approved' : ''}">
+        <div class="request-item ${['rejected','cancelled','expired'].includes(request.status) ? 'rejected' : request.status === 'active' || request.status === 'completed' ? 'approved' : ''}">
             <div class="item-header">
                 <span class="item-room">Room ${request.roomId} — ${request.roomCategory || ''}</span>
                 <span class="item-status ${statusClass[request.status] || ''}">${statusLabel[request.status] || request.status}</span>
@@ -527,7 +529,7 @@ function renderMyRequests() {
                 <div class="item-actions">
                     <button class="btn-remove" onclick="removeRequest('${request.id}')">Cancel Request</button>
                 </div>
-            ` : ['rejected','cancelled'].includes(request.status) ? `
+            ` : ['rejected','cancelled','expired'].includes(request.status) ? `
                 <div class="item-actions" style="padding-top:8px;border-top:1px solid var(--border,#eee);margin-top:8px;">
                     <button class="btn-remove" style="font-size:12px;padding:6px 14px;" onclick="dismissRequest('${request.id}')">Dismiss → History</button>
                 </div>
@@ -549,8 +551,8 @@ function renderMyHistory() {
             const sameUser = (r.instructor || '').toLowerCase().trim() === myHistUser;
             if (!sameUser) return false;
             if (r.status === 'completed') return true;
-            // rejected/cancelled: only show if dismissed
-            if ((r.status === 'rejected' || r.status === 'cancelled') && dismissed[r.id]) return true;
+            // rejected/cancelled/expired: only show if dismissed
+            if (['rejected','cancelled','expired'].includes(r.status) && dismissed[r.id]) return true;
             return false;
         })
         .sort((a, b) => new Date(b.requestedAt) - new Date(a.requestedAt));
@@ -562,8 +564,8 @@ function renderMyHistory() {
     }
     if (emptyState) emptyState.style.display = 'none';
 
-    const statusLabel = { completed: '✓ Completed', rejected: '✕ Rejected', cancelled: '✕ Cancelled' };
-    const statusBg    = { completed: '#27ae60', rejected: '#e74c3c', cancelled: '#95a5a6' };
+    const statusLabel = { completed: '✓ Completed', rejected: '✕ Rejected', cancelled: '✕ Cancelled', expired: '⌛ Expired' };
+    const statusBg    = { completed: '#27ae60', rejected: '#e74c3c', cancelled: '#95a5a6', expired: '#7f8c8d' };
 
     list.innerHTML = myHistory.map(r => {
         const duration = (r.startTime && r.endTime) ? calculateDuration(r.startTime, r.endTime) : '';
