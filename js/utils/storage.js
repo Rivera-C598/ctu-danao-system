@@ -1,376 +1,256 @@
 /* ============================================
-   CTU Room Management System - Storage Module
-   SYNC ENABLED VERSION - Real-time across devices
+   CTU Room Management System - API-backed state
    ============================================ */
 
-// Data Keys (kept for localStorage fallback)
 const STORAGE_KEYS = {
-    ROOMS: 'ctu_rooms',
-    LOGS: 'ctu_logs',
-    SCHEDULE_STATUS: 'ctu_schedule_status',
-    REQUESTS: 'ctu_requests',
-    USERS: 'ctu_users',
     CURRENT_USER: 'ctu_current_user'
 };
 
-// Categories
 const CATEGORIES = ["Comlab Room", "Machine Room", "Library Room", "Office Room"];
 
-// Default Data
-const DEFAULT_ROOMS = [
-    { id: 101, instructor: "", category: "Comlab Room", date: "", startTime: "", endTime: "", status: "Available", history: [], type: "register" },
-    { id: 102, instructor: "", category: "Comlab Room", date: "", startTime: "", endTime: "", status: "Available", history: [], type: "register" },
-    { id: 201, instructor: "", category: "Machine Room", date: "", startTime: "", endTime: "", status: "Available", history: [], type: "register" },
-    { id: 202, instructor: "", category: "Machine Room", date: "", startTime: "", endTime: "", status: "Available", history: [], type: "register" },
-    { id: 301, instructor: "", category: "Library Room", date: "", startTime: "", endTime: "", status: "Available", history: [], type: "register" },
-    { id: 401, instructor: "", category: "Office Room", date: "", startTime: "", endTime: "", status: "Available", history: [], type: "register" }
-];
-
-const DEFAULT_ADMIN = {
-    username: 'admin',
-    password: 'ctudanao@admin',
-    fullName: 'System Administrator',
-    email: 'admin@ctu.edu.ph',
-    role: 'admin',
-    createdAt: new Date().toISOString(),
-    lastLogin: null,
-    loginCount: 0,
-    isNewAccount: false
-};
-
-// ============================================
-// SYNC CONFIGURATION
-// ============================================
-
-// Socket.io instance
-let socket = null;
-let isConnected = false;
-let pendingSync = false;
-
-// Server URL - auto-detect the current host and port
-// Use the current page origin for HTTP(S) pages, otherwise fall back to localhost:3000.
-const SERVER_URL = window.location.protocol.startsWith('http')
-    ? window.location.origin
-    : 'http://localhost:3000';
-
-// ============================================
-// DATA VARIABLES (synced with server)
-// ============================================
-
-let allRooms = [...DEFAULT_ROOMS];
+let allRooms = [];
 let systemLogs = [];
 let scheduleStatus = {};
+let roomRequests = [];
 let pendingRequests = [];
-let usersDatabase = [DEFAULT_ADMIN];
+let usersDatabase = [];
+let registrationCodes = [];
+let notifications = [];
+let isConnected = false;
+let syncInitialized = false;
+let pollingTimer = null;
 
-// ============================================
-// SOCKET.IO SYNC FUNCTIONS
-// ============================================
+async function apiFetch(url, options = {}) {
+    const response = await fetch(url, {
+        credentials: 'include',
+        headers: {
+            'Content-Type': 'application/json',
+            ...(options.headers || {})
+        },
+        ...options
+    });
 
-/**
- * Initialize Socket.io connection
- */
-function initSync() {
-    // Load Socket.io library dynamically
-    const script = document.createElement('script');
-    script.src = 'https://cdn.socket.io/4.7.2/socket.io.min.js';
-    script.onload = () => {
-        connectToServer();
-    };
-    script.onerror = () => {
-        console.warn('⚠️ Could not load Socket.io, using localStorage only');
-        loadFromLocalStorage();
-    };
-    document.head.appendChild(script);
-}
-
-/**
- * Connect to sync server
- */
-function connectToServer() {
+    let payload = null;
     try {
-        socket = io(SERVER_URL, {
-            transports: ['websocket', 'polling'],
-            timeout: 5000
-        });
+        payload = await response.json();
+    } catch (_error) {
+        payload = null;
+    }
 
-        socket.on('connect', () => {
-            console.log('✅ Connected to sync server');
-            isConnected = true;
+    if (!response.ok) {
+        const error = new Error(payload?.error || `Request failed (${response.status})`);
+        error.status = response.status;
+        error.payload = payload;
+        throw error;
+    }
 
-            // If we have local data, send it to server (for first sync)
-            if (pendingSync) {
-                pushToServer();
-                pendingSync = false;
+    return payload;
+}
+
+let _lastDataHash = null;
+
+function _dataHash(data) {
+    // Fast fingerprint — lengths + last item ids + statuses
+    const rooms = (data.allRooms || []);
+    const reqs  = (data.roomRequests || data.pendingRequests || []);
+    const logs  = (data.systemLogs || []);
+    return [
+        rooms.length,
+        rooms.map(r => r.status).join(','),
+        reqs.length,
+        reqs.filter(r => r.status === 'pending').length,
+        reqs.filter(r => r.status === 'active').length,
+        logs.length,
+        (data.registrationCodes || []).length
+    ].join('|');
+}
+
+function applyServerData(data) {
+    const prevRequests = roomRequests || [];
+    allRooms = data.allRooms || [];
+    systemLogs = data.systemLogs || [];
+    scheduleStatus = data.scheduleStatus || {};
+    roomRequests = data.roomRequests || data.pendingRequests || [];
+    pendingRequests = roomRequests;
+    usersDatabase = data.usersDatabase || [];
+    registrationCodes = data.registrationCodes || [];
+    notifications = data.notifications || [];
+    isConnected = true;
+
+    // Notify admin of new pending requests
+    if (typeof showNotification === 'function' && prevRequests.length > 0) {
+        const session = typeof getSession === 'function' ? getSession() : null;
+        if (session?.role === 'admin') {
+            const prevPendingIds = new Set(prevRequests.filter(r => r.status === 'pending').map(r => r.id));
+            const newPending = (roomRequests || []).filter(r => r.status === 'pending' && !prevPendingIds.has(r.id));
+            if (newPending.length > 0) {
+                const r = newPending[0];
+                showNotification(
+                    `New Request${newPending.length > 1 ? ` (+${newPending.length})` : ''}`,
+                    `${r.instructorName || r.instructor} requested Room ${r.roomId} on ${r.date}`,
+                    'info', 6000
+                );
+                // Pulse the nav badge
+                const badge = document.getElementById('navBadgeRequests');
+                if (badge) {
+                    badge.style.animation = 'none';
+                    setTimeout(() => badge.style.animation = '', 10);
+                }
             }
-        });
+        }
+    }
 
-        socket.on('init', (serverData) => {
-            console.log('📥 Received initial data from server');
-            // Replace local data with server data
-            allRooms = serverData.allRooms || DEFAULT_ROOMS;
-            systemLogs = serverData.systemLogs || [];
-            scheduleStatus = serverData.scheduleStatus || {};
-            pendingRequests = serverData.pendingRequests || [];
-            usersDatabase = serverData.usersDatabase || [DEFAULT_ADMIN];
-
-            // Save to localStorage as backup
-            saveToLocalStorage();
-
-            // Refresh UI if functions exist
-            refreshUI();
-        });
-
-        socket.on('sync', (serverData) => {
-            console.log('🔄 Received sync update from server');
-            // Update data
-            allRooms = serverData.allRooms || allRooms;
-            systemLogs = serverData.systemLogs || systemLogs;
-            scheduleStatus = serverData.scheduleStatus || scheduleStatus;
-            pendingRequests = serverData.pendingRequests || pendingRequests;
-            usersDatabase = serverData.usersDatabase || usersDatabase;
-
-            // Save backup
-            saveToLocalStorage();
-
-            // Refresh UI
-            refreshUI();
-
-            // Show notification if on admin page
-            if (typeof updateScheduleNotifications === 'function') {
-                updateScheduleNotifications();
-            }
-        });
-
-        socket.on('requestUpdate', (action) => {
-            console.log('📨 Received request update:', action);
-            // Play notification sound or show toast
-            if (action.type === 'new_request' && typeof renderRequestsTable === 'function') {
-                renderRequestsTable();
-                alert(`📋 New room request from ${action.instructor} for Room ${action.roomId}`);
-            }
-        });
-
-        socket.on('disconnect', () => {
-            console.log('❌ Disconnected from server');
-            isConnected = false;
-        });
-
-        socket.on('connect_error', (err) => {
-            console.warn('⚠️ Connection error:', err.message);
-            isConnected = false;
-            // Fall back to localStorage
-            loadFromLocalStorage();
-        });
-
-    } catch (e) {
-        console.error('❌ Failed to initialize sync:', e);
-        loadFromLocalStorage();
+    // Instructor red-dot notifications on status changes
+    // (badge logic lives in renderMyRequests / renderMySchedules which run after this)
+    if (typeof showNotification === 'function' && prevRequests.length > 0) {
+        const session = typeof getSession === 'function' ? getSession() : null;
+        if (session?.role === 'instructor') {
+            roomRequests.forEach(r => {
+                const prev = prevRequests.find(p => p.id === r.id);
+                if (!prev || prev.status === r.status) return;
+                if (r.instructor !== session.username) return;
+                if (r.status === 'active') {
+                    showNotification('Room Approved!', `Room ${r.roomId} on ${r.date} has been approved.`, 'success', 6000);
+                } else if (r.status === 'standby') {
+                    showNotification('Added to Queue', `Room ${r.roomId} request is queued — waiting for current session to end.`, 'info', 5000);
+                } else if (r.status === 'rejected') {
+                    showNotification('Request Rejected', `Room ${r.roomId} on ${r.date} was rejected.${r.rejectionReason ? ' Reason: ' + r.rejectionReason : ''}`, 'warning', 7000);
+                }
+            });
+        }
     }
 }
 
-/**
- * Push current data to server
- */
-function pushToServer() {
-    if (socket && isConnected) {
-        socket.emit('update', {
-            allRooms: allRooms,
-            systemLogs: systemLogs,
-            scheduleStatus: scheduleStatus,
-            pendingRequests: pendingRequests,
-            usersDatabase: usersDatabase
+async function refreshData({ render = true, force = false } = {}) {
+    try {
+        const data = await apiFetch('/api/data');
+        const hash = _dataHash(data);
+        const changed = force || hash !== _lastDataHash;
+        _lastDataHash = hash;
+        applyServerData(data);
+        if (render && changed) refreshUI();
+        return data;
+    } catch (error) {
+        isConnected = false;
+        if (error.status === 401 && !location.pathname.endsWith('/Login.html')) {
+            clearSession();
+            window.location.href = '/html/Login.html';
+        }
+        throw error;
+    }
+}
+
+function initSync() {
+    if (syncInitialized) return;
+    syncInitialized = true;
+
+    refreshData({ render: true }).catch((error) => {
+        console.warn('Initial API sync failed:', error.message);
+    });
+
+    pollingTimer = setInterval(() => {
+        refreshData({ render: true }).catch((error) => {
+            console.warn('Polling sync failed:', error.message);
         });
-        console.log('📤 Pushed data to server');
-    } else {
-        pendingSync = true;
-        console.log('⏳ Queued sync for when server connects');
-    }
+    }, 5000);
 }
 
-/**
- * Notify other clients of request action
- */
-function notifyRequestAction(action) {
-    if (socket && isConnected) {
-        socket.emit('requestAction', action);
-    }
+function stopSync() {
+    if (pollingTimer) clearInterval(pollingTimer);
+    pollingTimer = null;
+    syncInitialized = false;
 }
 
-/**
- * Refresh UI after sync
- */
 function refreshUI() {
-    // Call render functions if they exist (admin pages)
     if (typeof renderTable === 'function') renderTable();
     if (typeof renderMonitoringTable === 'function') renderMonitoringTable();
     if (typeof renderRequestsTable === 'function') renderRequestsTable();
     if (typeof renderDatabaseTable === 'function') renderDatabaseTable();
     if (typeof updateStatusCounts === 'function') updateStatusCounts();
     if (typeof updateScheduleNotifications === 'function') updateScheduleNotifications();
+    if (typeof renderRegistrationCodes === 'function') renderRegistrationCodes();
+    if (typeof checkAndAutoApproveQueue === 'function') checkAndAutoApproveQueue();
+    if (typeof updateRequestsSidebar === 'function') updateRequestsSidebar();
 
-    // Call render functions if they exist (instructor pages)
     if (typeof renderInstructorAvailableRooms === 'function') renderInstructorAvailableRooms();
     if (typeof renderMySchedules === 'function') renderMySchedules();
     if (typeof renderMyRequests === 'function') renderMyRequests();
+    if (typeof renderMyHistory === 'function') renderMyHistory();
     if (typeof updateInstructorStats === 'function') updateInstructorStats();
 }
 
-// ============================================
-// LOCALSTORAGE FALLBACK FUNCTIONS
-// ============================================
-
-/**
- * Save to localStorage (backup)
- */
-function saveToLocalStorage() {
-    try {
-        localStorage.setItem(STORAGE_KEYS.ROOMS, JSON.stringify(allRooms));
-        localStorage.setItem(STORAGE_KEYS.LOGS, JSON.stringify(systemLogs));
-        localStorage.setItem(STORAGE_KEYS.SCHEDULE_STATUS, JSON.stringify(scheduleStatus));
-        localStorage.setItem(STORAGE_KEYS.REQUESTS, JSON.stringify(pendingRequests));
-        localStorage.setItem(STORAGE_KEYS.USERS, JSON.stringify(usersDatabase));
-    } catch (e) {
-        console.error('Error saving to localStorage:', e);
-    }
+async function saveToStorage() {
+    console.warn('saveToStorage is deprecated. Use explicit API endpoints for mutations.');
+    await refreshData({ render: true });
 }
 
-/**
- * Load from localStorage (fallback)
- */
-function loadFromLocalStorage() {
-    try {
-        allRooms = JSON.parse(localStorage.getItem(STORAGE_KEYS.ROOMS)) || DEFAULT_ROOMS;
-        systemLogs = JSON.parse(localStorage.getItem(STORAGE_KEYS.LOGS)) || [];
-        scheduleStatus = JSON.parse(localStorage.getItem(STORAGE_KEYS.SCHEDULE_STATUS)) || {};
-        pendingRequests = JSON.parse(localStorage.getItem(STORAGE_KEYS.REQUESTS)) || [];
-        usersDatabase = JSON.parse(localStorage.getItem(STORAGE_KEYS.USERS)) || [DEFAULT_ADMIN];
-        console.log('📦 Loaded from localStorage');
-    } catch (e) {
-        console.error('Error loading from localStorage:', e);
-    }
+async function saveUsersDatabase() {
+    console.warn('saveUsersDatabase is deprecated. Use auth/admin API endpoints.');
+    await refreshData({ render: true });
 }
 
-// ============================================
-// MAIN FUNCTIONS (Modified for Sync)
-// ============================================
-
-/**
- * Save all data - NOW SYNCS TO SERVER!
- */
-function saveToStorage() {
-    // Always save locally as backup
-    saveToLocalStorage();
-
-    // Push to server for sync
-    pushToServer();
-}
-
-/**
- * Save users database
- */
-function saveUsersDatabase() {
-    localStorage.setItem(STORAGE_KEYS.USERS, JSON.stringify(usersDatabase));
-    pushToServer(); // Also sync users
-}
-
-/**
- * Save current session
- */
 function saveSession(session) {
     localStorage.setItem(STORAGE_KEYS.CURRENT_USER, JSON.stringify(session));
 }
 
-/**
- * Get current session
- */
 function getSession() {
     const session = localStorage.getItem(STORAGE_KEYS.CURRENT_USER);
     return session ? JSON.parse(session) : null;
 }
 
-/**
- * Clear current session
- */
 function clearSession() {
     localStorage.removeItem(STORAGE_KEYS.CURRENT_USER);
 }
 
-/**
- * Add a system log entry
- */
-function addLog(action, roomId, user, category, details, status) {
-    const log = {
+async function addLog(action, roomId, user, category, details, status) {
+    systemLogs.unshift({
         timestamp: new Date().toISOString(),
-        roomId: roomId,
-        action: action,
-        user: user || 'Anonymous',
+        action,
+        roomId,
+        user: user || 'system',
         category: category || 'N/A',
         details: details || '',
-        status: status || 'N/A'
-    };
-    systemLogs.unshift(log);
-    saveToStorage();
+        status: status || ''
+    });
 }
 
-/**
- * Clear all system logs
- */
 function clearAllLogsData() {
     systemLogs = [];
-    scheduleStatus = {};
-    allRooms.forEach(room => {
-        room.history = [];
-    });
-    saveToStorage();
+    refreshUI();
 }
 
-/**
- * Export all data as JSON
- */
 function exportData() {
     return {
         exportDate: new Date().toISOString(),
         rooms: allRooms,
         logs: systemLogs,
-        scheduleStatus: scheduleStatus,
+        scheduleStatus,
         requests: pendingRequests,
-        users: usersDatabase
+        roomRequests,
+        users: usersDatabase,
+        registrationCodes
     };
 }
 
-/**
- * Reset all data to defaults
- */
-function resetAllData() {
-    allRooms = [...DEFAULT_ROOMS];
-    systemLogs = [];
-    scheduleStatus = {};
-    pendingRequests = [];
-    saveToStorage();
+async function resetAllData() {
+    throw new Error('Reset all data is disabled in API mode.');
 }
 
-// ============================================
-// INITIALIZATION
-// ============================================
-
-// Initialize sync when DOM is ready
-if (document.readyState === 'loading') {
-    document.addEventListener('DOMContentLoaded', initSync);
-} else {
-    initSync();
+function notifyRequestAction(_action) {
+    // Notifications are created by backend mutations in API mode.
 }
 
-// Export for use in other modules
 if (typeof module !== 'undefined' && module.exports) {
     module.exports = {
         STORAGE_KEYS,
         CATEGORIES,
-        DEFAULT_ROOMS,
+        apiFetch,
+        refreshData,
         allRooms,
         systemLogs,
         scheduleStatus,
         pendingRequests,
+        roomRequests,
         usersDatabase,
         saveToStorage,
         saveUsersDatabase,

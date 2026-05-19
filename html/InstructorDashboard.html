@@ -6,27 +6,25 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
     <title>Instructor Portal | CTU Danao Room Management</title>
     <link rel="icon" type="image/png" href="/assets/ctudanaologo.png">
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&display=swap" rel="stylesheet">
 
     <!-- SECURITY: Immediate authentication check - BLOCKS page rendering if not authenticated -->
     <script>
-        // Check authentication IMMEDIATELY before page renders
         (function () {
             const currentUserStr = localStorage.getItem('ctu_current_user');
             if (!currentUserStr || currentUserStr === 'null' || currentUserStr === '') {
-                console.warn('❌ UNAUTHORIZED ACCESS: Redirecting to login');
                 window.location.replace('/html/Login.html');
                 return;
             }
-
             try {
                 const currentUser = JSON.parse(currentUserStr);
                 if (!currentUser || currentUser.role !== 'instructor') {
-                    console.warn('❌ FORBIDDEN: Instructor role required');
                     window.location.replace('/html/Login.html');
                     return;
                 }
             } catch (e) {
-                console.error('Auth error:', e);
                 window.location.replace('/html/Login.html');
                 return;
             }
@@ -47,97 +45,25 @@
 
     <!-- INSTRUCTOR DASHBOARD -->
     <div id="instructorView" class="dashboard-wrapper">
-        <!-- Mobile Header -->
+
+        <!-- Mobile Top Header -->
         <header class="mobile-top-header">
             <div class="mobile-header-top">
                 <div class="mobile-profile-section">
-                    <div class="mobile-profile-avatar" id="mobileInstructorAvatar" onclick="openProfileModal()">👤</div>
-                    <span class="mobile-profile-username" id="mobileInstructorUsername">Profile</span>
+                    <div class="mobile-profile-avatar" id="mobileInstructorAvatar" onclick="openProfileModal()" style="cursor:pointer;" title="View profile">👤</div>
+                    <span class="mobile-profile-username" id="mobileInstructorUsername">Instructor</span>
                 </div>
-
-                <div class="mobile-controls">
-                    <select class="mobile-room-filter" id="mobileRoomFilter" onchange="filterRoomsByStatus(this.value)">
-                        <option value="all">All Rooms</option>
-                        <option value="available">Available</option>
-                        <option value="locked">Locked</option>
-                        <option value="meeting">Meeting</option>
-                        <option value="maintenance">Maintenance</option>
-                    </select>
-                </div>
-            </div>
-
-            <div class="mobile-search-container">
-                <input type="text" class="mobile-search-bar" id="mobileRoomSearch" placeholder="Search room..."
-                    onkeyup="filterRoomsBySearch(this.value)">
             </div>
         </header>
 
-        <!-- Main Content -->
-        <main class="main-content">
-            <!-- Available Rooms Tab -->
-            <div id="availableTab" class="container instructor-container">
-                <div id="availableRoomsGrid" class="rooms-grid">
-                    <!-- Rooms will be populated here -->
-                </div>
-
-                <div id="noAvailableRooms" class="no-data-message" style="display: none;">
-                    <p>No available rooms found.</p>
-                </div>
-            </div>
-
-            <!-- My Schedules Tab -->
-            <div id="mySchedulesTab" class="container instructor-container" style="display: none;">
-                <div class="schedules-list" id="mySchedulesList">
-                    <!-- My schedules will be populated here -->
-                </div>
-
-                <div id="noMySchedules" class="no-data-message" style="display: none;">
-                    <p>You don't have any scheduled rooms yet.</p>
-                </div>
-            </div>
-
-            <!-- Pending Requests Tab -->
-            <div id="requestsTab" class="container instructor-container" style="display: none;">
-                <div class="requests-list" id="pendingRequestsList">
-                    <!-- Pending requests will be populated here -->
-                </div>
-
-                <div id="noPendingRequests" class="no-data-message" style="display: none;">
-                    <p>No pending requests.</p>
-                </div>
-            </div>
-        </main>
-
-        <!-- Mobile Bottom Navigation -->
-        <nav class="mobile-bottom-nav">
-            <button class="nav-btn active" onclick="switchInstructorTab('available')">
-                <span class="nav-icon">🏠</span>
-                <span class="nav-text">Home</span>
-            </button>
-            <button class="nav-btn" onclick="switchInstructorTab('myschedules')">
-                <span class="nav-icon">⏳</span>
-                <span class="nav-text">Pending</span>
-                <span class="nav-badge" id="pendingBadge" style="display: none;"></span>
-            </button>
-            <button class="nav-btn" onclick="switchInstructorTab('requests')">
-                <span class="nav-icon">📋</span>
-                <span class="nav-text">Request</span>
-                <span class="nav-badge" id="requestBadge" style="display: none;"></span>
-            </button>
-            <button class="nav-btn" onclick="logout()">
-                <span class="nav-icon">🚪</span>
-                <span class="nav-text">Logout</span>
-            </button>
-        </nav>
-
-        <!-- Hidden Desktop Sidebar (for larger screens) -->
+        <!-- Desktop Sidebar (hidden on mobile) -->
         <aside class="sidebar instructor-sidebar desktop-only">
             <div class="sidebar-header-box">
-                <h3> INSTRUCTOR PORTAL</h3>
+                <h3>INSTRUCTOR PORTAL</h3>
             </div>
 
             <div class="instructor-profile profile-section">
-                <div class="profile-avatar" id="instructorAvatar">CTU</div>
+                <div class="profile-avatar" id="instructorAvatar">I</div>
                 <div class="profile-info">
                     <span class="profile-name" id="instructorName">Instructor Name</span>
                     <span class="profile-role">Department of Technology</span>
@@ -145,16 +71,16 @@
             </div>
 
             <div class="instructor-menu">
-                <button class="menu-btn active" onclick="switchInstructorTab('available')">
-                    <span>🏠</span> Available Rooms
-                </button>
-                <button class="menu-btn" onclick="switchInstructorTab('myschedules')">
+                <button class="menu-btn active" id="menuBtnSchedule" onclick="switchInstructorTab('myschedules')">
                     <span>📅</span> My Schedules
-                    <span class="badge" id="myScheduleCount">0</span>
+                    <span class="badge" id="scheduleBadge" style="display:none;">0</span>
                 </button>
-                <button class="menu-btn" onclick="switchInstructorTab('requests')">
-                    <span>⏳</span> Pending Requests
-                    <span class="badge" id="pendingRequestCount">0</span>
+                <button class="menu-btn" id="menuBtnRequests" onclick="switchInstructorTab('requests')">
+                    <span>📋</span> My Requests
+                    <span class="badge" id="requestBadgeDesk" style="display:none;">0</span>
+                </button>
+                <button class="menu-btn" id="menuBtnHistory" onclick="switchInstructorTab('history')">
+                    <span>🕐</span> History
                 </button>
             </div>
 
@@ -167,66 +93,275 @@
                     <span class="stat-number" id="instApprovedCount">0</span>
                     <span class="stat-label">Approved</span>
                 </div>
+                <div class="stat-box">
+                    <span class="stat-number" id="myScheduleCount">0</span>
+                    <span class="stat-label">Active</span>
+                </div>
+                <div class="stat-box">
+                    <span class="stat-number" id="pendingRequestCount">0</span>
+                    <span class="stat-label">Pending</span>
+                </div>
             </div>
 
             <button class="btn-logout" onclick="logout()">🚪 Logout</button>
         </aside>
+
+        <!-- Main Content -->
+        <main class="main-content">
+
+            <!-- MY SCHEDULES TAB -->
+            <div id="mySchedulesTab" class="instructor-tab-panel">
+
+                <!-- Clock bar -->
+                <div style="display:flex;justify-content:space-between;align-items:center;padding:10px 4px 14px;border-bottom:1px solid var(--border,rgba(255,255,255,0.08));margin-bottom:14px;">
+                    <span id="instrDateLabel" style="font-size:0.78rem;opacity:0.55;"></span>
+                    <span id="instructorClock" style="font-size:1.05rem;font-weight:700;color:var(--red,#c0392b);font-variant-numeric:tabular-nums;"></span>
+                </div>
+
+                <!-- Empty state -->
+                <div id="emptyScheduleState" class="empty-state-card">
+                    <div class="empty-state-icon">📅</div>
+                    <p id="greetingText" class="greeting-text">Good morning, Instructor!</p>
+                    <p id="pendingNote" class="pending-note" style="display:none;"></p>
+                    <button class="btn-request-room-main" onclick="openRoomPicker()">
+                        + Request a Room
+                    </button>
+                </div>
+
+                <!-- Schedules list -->
+                <div id="mySchedulesList" class="schedules-list"></div>
+                <div id="noMySchedules" class="no-data-message" style="display:none;">
+                    <p>You have no active schedules.</p>
+                </div>
+            </div>
+
+            <!-- REQUESTS TAB -->
+            <div id="requestsTab" class="instructor-tab-panel" style="display:none;">
+
+                <!-- Empty state -->
+                <div id="emptyRequestsState" class="empty-state-card">
+                    <div class="empty-state-icon">📋</div>
+                    <p class="greeting-text">No Pending Requests</p>
+                    <p style="color:var(--text-sub);font-size:13px;">You have no requests awaiting admin review.</p>
+                </div>
+
+                <!-- Requests list -->
+                <div id="pendingRequestsList" class="requests-list"></div>
+                <div id="noPendingRequests" class="no-data-message" style="display:none;">
+                    <p>No pending requests found.</p>
+                </div>
+            </div>
+
+            <!-- HISTORY TAB -->
+            <div id="historyTab" class="instructor-tab-panel" style="display:none;">
+
+                <!-- Empty state -->
+                <div id="emptyHistoryState" class="empty-state-card">
+                    <div class="empty-state-icon">🕐</div>
+                    <p class="greeting-text">No History Yet</p>
+                    <p style="color:var(--text-sub);font-size:13px;">Completed, rejected and cancelled requests will appear here.</p>
+                </div>
+
+                <!-- History list -->
+                <div id="historyList" class="requests-list"></div>
+            </div>
+
+            <!-- SETTINGS TAB -->
+            <div id="settingsTab" class="instructor-tab-panel" style="display:none;">
+                <!-- Profile card -->
+                <div style="background:var(--surface,#fff);border-radius:16px;padding:24px;margin-bottom:14px;border:1px solid var(--border,#f0f0f0);">
+                    <div style="display:flex;align-items:center;gap:16px;">
+                        <div style="position:relative;flex-shrink:0;">
+                            <div id="settingsAvatar" style="width:64px;height:64px;border-radius:50%;background:#c0392b;color:white;display:flex;align-items:center;justify-content:center;font-weight:800;font-size:22px;overflow:hidden;"></div>
+                            <label title="Change photo" style="position:absolute;bottom:0;right:0;width:22px;height:22px;border-radius:50%;background:#c0392b;color:white;display:flex;align-items:center;justify-content:center;cursor:pointer;font-size:11px;border:2px solid var(--surface,#fff);">
+                                📷<input type="file" accept="image/*" style="display:none;" onchange="uploadAvatar(this)">
+                            </label>
+                        </div>
+                        <div style="flex:1;min-width:0;">
+                            <div id="settingsName" style="font-weight:700;font-size:1rem;"></div>
+                            <div id="settingsUsername" style="font-size:0.8rem;color:#888;"></div>
+                            <div id="settingsEmail" style="font-size:0.8rem;color:#888;margin-top:2px;"></div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Edit profile -->
+                <div style="background:var(--surface,#fff);border-radius:16px;overflow:hidden;margin-bottom:14px;border:1px solid var(--border,#f0f0f0);">
+                    <div style="padding:14px 18px;border-bottom:1px solid var(--border,#f0f0f0);font-weight:700;font-size:0.88rem;color:var(--text,#333);">Edit Profile</div>
+                    <div style="padding:16px 18px;">
+                        <div class="form-group">
+                            <label>Full Name *</label>
+                            <input type="text" id="settingsFullName" placeholder="Your full name">
+                        </div>
+                        <div class="form-group">
+                            <label>Email</label>
+                            <input type="email" id="settingsEmail2" placeholder="your@email.com (optional)">
+                        </div>
+                        <div id="settingsMsg" style="display:none;font-size:0.82rem;padding:8px 12px;border-radius:8px;margin-bottom:10px;"></div>
+                        <button class="btn-submit" onclick="saveSettingsProfile()" style="width:100%;padding:12px;">Save Changes</button>
+                    </div>
+                </div>
+
+                <!-- Change password -->
+                <div style="background:var(--surface,#fff);border-radius:16px;overflow:hidden;margin-bottom:14px;border:1px solid var(--border,#f0f0f0);">
+                    <div style="padding:14px 18px;border-bottom:1px solid var(--border,#f0f0f0);font-weight:700;font-size:0.88rem;color:var(--text,#333);">Change Password</div>
+                    <div style="padding:16px 18px;">
+                        <div class="form-group">
+                            <label>Current Password</label>
+                            <input type="password" id="settingsCurrentPw" placeholder="Enter current password">
+                        </div>
+                        <div class="form-group">
+                            <label>New Password</label>
+                            <input type="password" id="settingsNewPw" placeholder="Min 6 characters">
+                        </div>
+                        <div class="form-group">
+                            <label>Confirm New Password</label>
+                            <input type="password" id="settingsConfirmPw" placeholder="Repeat new password">
+                        </div>
+                        <div id="settingsPwMsg" style="display:none;font-size:0.82rem;padding:8px 12px;border-radius:8px;margin-bottom:10px;"></div>
+                        <button class="btn-submit" onclick="saveSettingsPassword()" style="width:100%;padding:12px;">Update Password</button>
+                    </div>
+                </div>
+
+                <!-- Logout -->
+                <div style="background:var(--surface,#fff);border-radius:16px;overflow:hidden;border:1px solid var(--border,#f0f0f0);">
+                    <button onclick="logout()" style="width:100%;padding:16px 18px;background:transparent;border:none;color:#e74c3c;font-weight:700;font-size:0.95rem;cursor:pointer;text-align:left;font-family:inherit;">
+                        🚪 Logout
+                    </button>
+                </div>
+            </div>
+
+        </main>
+
+        <!-- Floating Request Button (mobile) -->
+        <button id="floatingRequestBtn" class="floating-request-btn" onclick="openRoomPicker()" style="display:none;">
+            + Request Room
+        </button>
+
+        <!-- Mobile Bottom Navigation -->
+        <nav class="mobile-bottom-nav">
+            <button class="nav-btn active" id="navBtnSchedule" onclick="switchInstructorTab('myschedules')">
+                <span class="nav-icon">📅</span>
+                <span class="nav-text">Schedule</span>
+            </button>
+            <button class="nav-btn" id="navBtnRequests" onclick="switchInstructorTab('requests')">
+                <span class="nav-icon">📋</span>
+                <span class="nav-text">Requests</span>
+                <span class="nav-badge" id="requestBadge" style="display:none;"></span>
+            </button>
+            <button class="nav-btn" id="navBtnHistory" onclick="switchInstructorTab('history')">
+                <span class="nav-icon">🕐</span>
+                <span class="nav-text">History</span>
+            </button>
+            <button class="nav-btn" id="navBtnSettings" onclick="switchInstructorTab('settings')">
+                <span class="nav-icon" id="navProfileIcon">
+                    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83-2.83l.06-.06A1.65 1.65 0 0 0 4.68 15a1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 2.83-2.83l.06.06A1.65 1.65 0 0 0 9 4.68a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 2.83l-.06.06A1.65 1.65 0 0 0 19.4 9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"/></svg>
+                </span>
+                <span class="nav-text">Settings</span>
+            </button>
+        </nav>
+
+    </div><!-- end .dashboard-wrapper -->
+
+    <!-- ROOM PICKER SHEET (overlay) -->
+    <div id="roomPickerSheet" class="room-picker-sheet" style="display:none;" onclick="if(event.target===this)closeRoomPicker()">
+        <div class="room-picker-inner">
+            <div class="room-picker-header">
+                <h3>Select a Room</h3>
+                <button class="btn-close" onclick="closeRoomPicker()">&times;</button>
+            </div>
+            <div class="room-picker-search-wrap">
+                <input type="text" id="roomPickerSearch" class="room-picker-search" placeholder="Search by room number or category..."
+                    oninput="filterRoomPicker(this.value)">
+            </div>
+            <div id="roomPickerList" class="room-picker-list"></div>
+        </div>
+    </div>
+
+    <!-- PROFILE MODAL -->
+    <div id="profileModal" class="modal modal-hidden" onclick="if(event.target===this)closeProfileModal()">
+        <div class="modal-content" style="max-width:420px;">
+            <div class="modal-header">
+                <h3>My Profile</h3>
+                <button class="btn-close" onclick="closeProfileModal()">&times;</button>
+            </div>
+            <div class="modal-body">
+                <div style="text-align:center;margin-bottom:20px;">
+                    <div style="position:relative;display:inline-block;">
+                        <div id="profileAvatar" style="width:80px;height:80px;border-radius:50%;background:#c0392b;color:white;display:flex;align-items:center;justify-content:center;font-weight:800;font-size:28px;margin:0 auto;overflow:hidden;"></div>
+                        <label title="Change photo" style="position:absolute;bottom:0;right:0;width:26px;height:26px;border-radius:50%;background:#c0392b;color:white;display:flex;align-items:center;justify-content:center;cursor:pointer;font-size:13px;border:2px solid white;">
+                            📷<input type="file" id="avatarFileInput" accept="image/*" style="display:none;" onchange="uploadAvatar(this)">
+                        </label>
+                    </div>
+                    <div id="profileUsername" style="font-size:0.82rem;color:var(--text-sub,#888);margin-top:8px;">@username</div>
+                </div>
+                <div class="form-group">
+                    <label>Full Name *</label>
+                    <input type="text" id="profileFullName" placeholder="Your full name">
+                </div>
+                <div class="form-group">
+                    <label>Email</label>
+                    <input type="email" id="profileEmail" placeholder="your@email.com (optional)">
+                </div>
+                <div id="profileMsg" style="display:none;font-size:0.82rem;padding:8px 12px;border-radius:8px;margin-top:8px;"></div>
+            </div>
+            <div class="modal-footer">
+                <button class="btn-cancel" onclick="closeProfileModal()">Cancel</button>
+                <button class="btn-submit" onclick="saveProfile()">Save Changes</button>
+            </div>
+        </div>
     </div>
 
     <!-- REQUEST MODAL -->
-    <div id="requestModal" class="modal" style="display: none;">
+    <div id="requestModal" class="modal modal-hidden" onclick="if(event.target===this)closeRequestModal()">
         <div class="modal-content">
             <div class="modal-header">
-                <h3> Request Room Schedule</h3>
+                <h3>Request Room Schedule</h3>
                 <button class="btn-close" onclick="closeRequestModal()">&times;</button>
             </div>
             <div class="modal-body">
                 <div class="room-preview">
-                    <span class="room-number" id="requestRoomNumber">Room 101</span>
-                    <span class="room-category" id="requestRoomCategory">Comlab Room</span>
+                    <span class="room-number" id="requestRoomNumber">Room —</span>
+                    <span class="room-category" id="requestRoomCategory"></span>
                 </div>
 
                 <div class="form-group">
-                    <label>Requested Status</label>
+                    <label>Usage Type</label>
                     <div class="request-type-options">
                         <label class="radio-label">
                             <input type="radio" name="requestStatus" value="locked" checked>
-                            <span class="radio-text">🔒 Locked</span>
+                            <span class="radio-text">🔒 Class / Private Use</span>
                         </label>
                         <label class="radio-label">
                             <input type="radio" name="requestStatus" value="meeting">
-                            <span class="radio-text">👥 Meeting</span>
-                        </label>
-                        <label class="radio-label">
-                            <input type="radio" name="requestStatus" value="maintenance">
-                            <span class="radio-text">🔧 Maintenance</span>
+                            <span class="radio-text">👥 Group Meeting</span>
                         </label>
                     </div>
                 </div>
 
                 <div class="form-group">
                     <label>Date</label>
-                    <input type="date" id="requestDate" min="">
+                    <input type="date" id="requestDate" min="" onchange="checkMyExistingBooking()">
                 </div>
 
                 <div class="form-row">
                     <div class="form-group">
                         <label>Start Time</label>
-                        <input type="time" id="requestStartTime">
+                        <input type="time" id="requestStartTime" onchange="autoFillEndTime();checkMyExistingBooking();" step="900">
                     </div>
                     <div class="form-group">
                         <label>End Time</label>
-                        <input type="time" id="requestEndTime">
+                        <input type="time" id="requestEndTime" onchange="checkMyExistingBooking();" step="900">
                     </div>
                 </div>
 
                 <div class="form-group">
                     <label>Purpose / Activity</label>
-                    <textarea id="requestPurpose" rows="3"
-                        placeholder="Describe the purpose of this room request..."></textarea>
+                    <textarea id="requestPurpose" rows="3" placeholder="Describe the purpose of this room request..."></textarea>
                 </div>
 
-                <div class="conflict-warning" id="conflictWarning" style="display: none;">
+                <div id="myBookingWarning" style="display:none;background:rgba(243,156,18,0.12);border:1px solid rgba(243,156,18,0.3);border-radius:8px;padding:10px 12px;font-size:12px;color:#d4680a;margin-bottom:8px;"></div>
+                <div class="conflict-warning" id="conflictWarning" style="display:none;">
                     <span>⚠️</span> This time slot conflicts with an existing schedule.
                 </div>
             </div>
@@ -238,9 +373,7 @@
     </div>
 
     <!-- JavaScript Files -->
-    <script src="../js/utils/storage.js"></script>
-    <script src="../js/utils/helpers.js"></script>
-    <script src="https://cdn.socket.io/4.7.2/socket.io.min.js"></script>
+    <script src="/js/utils/dialogs.js"></script>
     <script src="/js/utils/storage.js"></script>
     <script src="/js/utils/auth-guard.js"></script>
     <script src="/js/utils/notifications.js"></script>
@@ -250,37 +383,22 @@
     <script src="/js/instructor/requests.js"></script>
     <script src="/js/utils/mobile-helper.js"></script>
     <script>
-        // Initialize Socket.io for real-time synchronization
-        const socket = io();
+        const socket = { on: function () {} };
+        socket.on('connect', () => {});
+        socket.on('disconnect', () => {});
 
-        socket.on('connect', () => {
-            console.log('✅ Connected to server for real-time sync');
-            showNotification('Connected', 'Real-time synchronization active', 'success', 3000);
-        });
-
-        socket.on('disconnect', () => {
-            console.log('❌ Disconnected from server');
-            showNotification('Disconnected', 'Using local cache until reconnection', 'warning', 5000);
-        });
-
-        // Initialize on page load
         document.addEventListener('DOMContentLoaded', function () {
-            // CHECK AUTHENTICATION - REDIRECT IF NOT AUTHORIZED
-            if (!protectPage()) {
-                return; // User not authenticated, redirected to login
-            }
+            if (!protectPage()) return;
 
             const currentUser = getCurrentUser();
             if (!currentUser || currentUser.role !== 'instructor') {
-                console.warn('Unauthorized: Not an instructor');
-                alert('⛔ Access Denied: Instructor access required');
                 window.location.href = '/html/Login.html';
                 return;
             }
 
+            initSync();
             initInstructorView();
 
-            // Request notification permission
             if ('Notification' in window && Notification.permission === 'default') {
                 Notification.requestPermission();
             }

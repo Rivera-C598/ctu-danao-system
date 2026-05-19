@@ -24,6 +24,7 @@ function clearRegisterForm() {
     document.getElementById('regFullName').value = '';
     document.getElementById('regEmail').value = '';
     document.getElementById('regPhoneNumber').value = '';
+    if (document.getElementById('regCode')) document.getElementById('regCode').value = '';
     document.getElementById('regPassword').value = '';
     document.getElementById('regConfirmPassword').value = '';
     document.getElementById('regTerms').checked = false;
@@ -174,13 +175,15 @@ function validateRegistrationForm() {
 function updateRegisterButton() {
     const termsChecked = document.getElementById('regTerms').checked;
     const fullName = document.getElementById('regFullName').value.trim();
+    const code = document.getElementById('regCode') ? document.getElementById('regCode').value.trim() : '';
     const btn = document.getElementById('btnRegister');
 
     const isValid = isUsernameAvailable &&
         isPasswordValid &&
         isPasswordMatched &&
         termsChecked &&
-        fullName;
+        fullName &&
+        code;
 
     btn.disabled = !isValid;
 }
@@ -188,11 +191,12 @@ function updateRegisterButton() {
 /**
  * Perform registration
  */
-function performRegistration() {
+async function performRegistration() {
     const username = document.getElementById('regUsername').value.trim().toLowerCase();
     const fullName = document.getElementById('regFullName').value.trim();
     const email = document.getElementById('regEmail').value.trim();
     const phoneNumber = document.getElementById('regPhoneNumber').value.trim();
+    const registrationCode = document.getElementById('regCode') ? document.getElementById('regCode').value.trim() : '';
     const password = document.getElementById('regPassword').value;
     const messageEl = document.getElementById('registerMessage');
 
@@ -209,42 +213,29 @@ function performRegistration() {
         return;
     }
 
-    // Double-check username doesn't exist
-    const existingUser = usersDatabase.find(u => u.username.toLowerCase() === username);
-    if (existingUser) {
-        messageEl.innerHTML = `Username "${username}" was just taken. <a href="#" onclick="switchToLogin(); return false;">Sign in instead?</a>`;
+    if (!registrationCode) {
+        messageEl.textContent = 'Registration code is required';
         messageEl.className = 'register-message error';
-        isUsernameAvailable = false;
-        updateRegisterButton();
         return;
     }
 
-    // Create new user account
-    const newUser = {
-        username: username,
-        password: password,
-        fullName: fullName,
-        email: email || null,
-        phoneNumber: phoneNumber,
-        role: selectedRegRole,
-        createdAt: new Date().toISOString(),
-        lastLogin: null,
-        loginCount: 0,
-        isNewAccount: true
-    };
+    try {
+        await apiFetch('/api/auth/register', {
+            method: 'POST',
+            body: JSON.stringify({ username, password, fullName, email: email || null, phoneNumber, registrationCode })
+        });
+        messageEl.innerHTML = `✓ Account created successfully! Welcome, <strong>${fullName}</strong>! Redirecting to login...`;
+        messageEl.className = 'register-message success';
 
-    usersDatabase.push(newUser);
-    saveUsersDatabase();
-
-    // Show success message and switch to login
-    messageEl.innerHTML = `✓ Account created successfully! Welcome, <strong>${fullName}</strong>! Redirecting to login...`;
-    messageEl.className = 'register-message success';
-
-    setTimeout(() => {
-        switchToLogin();
-        document.getElementById('loginUsername').value = username;
-        document.getElementById('loginError').innerHTML = `<span style="color: var(--available);">Account created! Please sign in with your new credentials.</span>`;
-    }, 2000);
+        setTimeout(() => {
+            switchToLogin();
+            document.getElementById('loginUsername').value = username;
+            document.getElementById('loginError').innerHTML = `<span style="color: var(--available);">Account created! Please sign in with your new credentials.</span>`;
+        }, 1500);
+    } catch (error) {
+        messageEl.textContent = error.message;
+        messageEl.className = 'register-message error';
+    }
 }
 
 // Event listeners for registration form
@@ -255,7 +246,7 @@ document.addEventListener('change', function (e) {
 });
 
 document.addEventListener('input', function (e) {
-    if (e.target && e.target.id === 'regFullName') {
+    if (e.target && (e.target.id === 'regFullName' || e.target.id === 'regCode')) {
         updateRegisterButton();
     }
 });

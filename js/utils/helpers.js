@@ -2,6 +2,45 @@
    CTU Room Management System - Helpers Module
    ============================================ */
 
+const AVATAR_COLORS = ['#c0392b','#2980b9','#27ae60','#8e44ad','#d4680a','#16a085','#2c3e50','#e91e63'];
+function avatarColor(name) {
+    let h = 0;
+    for (let i = 0; i < (name||'').length; i++) h = (h * 31 + name.charCodeAt(i)) & 0xffffffff;
+    return AVATAR_COLORS[Math.abs(h) % AVATAR_COLORS.length];
+}
+function avatarInitials(name) {
+    const parts = (name||'?').trim().split(/\s+/);
+    return parts.length >= 2 ? (parts[0][0] + parts[parts.length-1][0]).toUpperCase() : (name||'?')[0].toUpperCase();
+}
+function avatarHtml(name, size = 36, fontSize = 14) {
+    const bg = avatarColor(name);
+    const initials = avatarInitials(name);
+    return `<div style="width:${size}px;height:${size}px;border-radius:50%;background:${bg};color:white;display:flex;align-items:center;justify-content:center;font-weight:700;font-size:${fontSize}px;flex-shrink:0;user-select:none;">${initials}</div>`;
+}
+
+function fmt12(timeStr) {
+    if (!timeStr) return '—';
+    const [h, m] = timeStr.split(':').map(Number);
+    if (isNaN(h)) return timeStr;
+    const ampm = h >= 12 ? 'PM' : 'AM';
+    const h12  = h % 12 || 12;
+    return `${h12}:${String(m).padStart(2,'0')} ${ampm}`;
+}
+
+function fmt12Range(start, end) {
+    return `${fmt12(start)} – ${fmt12(end)}`;
+}
+
+function escapeHtml(str) {
+    if (str == null) return '';
+    return String(str)
+        .replace(/&/g, '&amp;')
+        .replace(/</g, '&lt;')
+        .replace(/>/g, '&gt;')
+        .replace(/"/g, '&quot;')
+        .replace(/'/g, '&#39;');
+}
+
 /**
  * Convert time string to minutes
  * @param {string} timeStr - Time in "HH:MM" format
@@ -112,10 +151,10 @@ function checkTimeConflict(room, date, startTime, endTime) {
         }
     }
 
-    // Check against approved pending requests
-    const existingRequests = pendingRequests.filter(r =>
+    // Check against active or standby API request rows.
+    const existingRequests = roomRequests.filter(r =>
         r.roomId === room.id &&
-        r.status === 'approved' &&
+        ['active', 'standby'].includes(r.status) &&
         r.date === date
     );
 
@@ -162,24 +201,26 @@ function checkDuplicateSchedule(roomId, date, startTime, endTime) {
  * Start the system clock
  */
 function startClock() {
-    // Update immediately instead of waiting for interval
     const updateClock = () => {
-        const now = new Date().toLocaleTimeString();
-        const clockElements = document.querySelectorAll('.system-time');
-        clockElements.forEach(el => {
-            el.innerText = now;
-        });
+        const now = new Date();
+        const timeStr = now.toLocaleTimeString('en-PH', { hour: '2-digit', minute: '2-digit', second: '2-digit', hour12: true });
 
-        // Update notifications if function exists
-        if (typeof updateScheduleNotifications === 'function') {
-            updateScheduleNotifications();
-        }
+        document.querySelectorAll('.system-time').forEach(el => { el.innerText = timeStr; });
+
+        const adminClock = document.getElementById('adminClock');
+        if (adminClock) adminClock.textContent = timeStr;
+
+        const instrClock = document.getElementById('instructorClock');
+        if (instrClock) instrClock.textContent = timeStr;
+
+        // Put date + time together in the date label
+        const dateLabel = document.getElementById('instrDateLabel');
+        if (dateLabel) dateLabel.textContent = now.toLocaleDateString('en-PH', { weekday: 'long', month: 'long', day: 'numeric', year: 'numeric' });
+
+        if (typeof updateScheduleNotifications === 'function') updateScheduleNotifications();
     };
 
-    // Call immediately on load
     updateClock();
-
-    // Then update every second
     setInterval(updateClock, 1000);
 }
 

@@ -40,7 +40,7 @@
                         <div class="password-input-wrapper">
                             <input type="password" id="loginPassword" placeholder="Enter your password">
                             <button type="button" class="btn-toggle-password"
-                                onclick="togglePasswordVisibility('loginPassword')">👁️</button>
+                                onclick="togglePasswordVisibility('loginPassword', event)">👁️</button>
                         </div>
                     </div>
 
@@ -74,9 +74,9 @@
                     </div>
 
                     <div class="input-group">
-                        <label>Phone Number *</label>
-                        <input type="tel" id="regPhoneNumber" placeholder="Enter your phone number">
-                        <small style="color: #666;">Required for account recovery</small>
+                        <label>Registration Code *</label>
+                        <input type="text" id="regCode" placeholder="Enter one-time code from admin">
+                        <small style="color: #666;">Ask an administrator for a one-time registration code</small>
                     </div>
 
                     <div class="input-group">
@@ -85,7 +85,7 @@
                             <input type="password" id="regPassword" placeholder="Create password"
                                 onkeyup="checkPasswordStrength()">
                             <button type="button" class="btn-toggle-password"
-                                onclick="togglePasswordVisibility('regPassword')">👁️</button>
+                                onclick="togglePasswordVisibility('regPassword', event)">👁️</button>
                         </div>
                         <div id="passwordStrength" class="password-strength"></div>
                     </div>
@@ -96,7 +96,7 @@
                             <input type="password" id="regConfirmPassword" placeholder="Confirm your password"
                                 onkeyup="checkPasswordMatch()">
                             <button type="button" class="btn-toggle-password"
-                                onclick="togglePasswordVisibility('regConfirmPassword')">👁️</button>
+                                onclick="togglePasswordVisibility('regConfirmPassword', event)">👁️</button>
                         </div>
                         <span id="passwordMatch" class="field-status"></span>
                     </div>
@@ -118,62 +118,13 @@
 
                 <!-- Recovery Mode -->
                 <div id="recoveryMode" style="display: none;">
-                    <!-- PHASE 1: Phone Verification -->
-                    <div id="recoveryPhase1">
-                        <h3 style="text-align: center; color: #333; margin-bottom: 20px;">🔐 Account Recovery</h3>
-
-                        <div class="input-group">
-                            <label>Username / ID *</label>
-                            <input type="text" id="recoveryUsername2" placeholder="Enter your username">
-                        </div>
-
-                        <div class="input-group">
-                            <label>Phone Number *</label>
-                            <input type="tel" id="recoveryPhoneNumber2"
-                                placeholder="Enter your registered phone number">
-                            <small style="color: #666;">We'll verify your phone number to reset your password</small>
-                        </div>
-
-                        <div id="recoveryPhase1Message" class="recovery-message" style="display: none;"></div>
-
-                        <button class="btn-login" onclick="verifyPhoneNumberUI()">Verify Phone Number</button>
-
-                        <div class="switch-mode">
-                            <p><a href="#" onclick="switchToLogin()">Back to Sign In</a></p>
-                        </div>
-                    </div>
-
-                    <!-- PHASE 2: New Password Creation -->
-                    <div id="recoveryPhase2" style="display: none;">
-                        <h3 style="text-align: center; color: #333; margin-bottom: 20px;">✓ Phone Verified - Create New
-                            Password</h3>
-
-                        <div class="input-group">
-                            <label>New Password *</label>
-                            <div class="password-input-wrapper">
-                                <input type="password" id="recoveryNewPassword2"
-                                    placeholder="Enter new password">
-                                <button type="button" class="btn-toggle-password"
-                                    onclick="togglePasswordVisibility('recoveryNewPassword2')">👁️</button>
-                            </div>
-                        </div>
-
-                        <div class="input-group">
-                            <label>Confirm Password *</label>
-                            <div class="password-input-wrapper">
-                                <input type="password" id="recoveryConfirmPassword2" placeholder="Confirm new password">
-                                <button type="button" class="btn-toggle-password"
-                                    onclick="togglePasswordVisibility('recoveryConfirmPassword2')">👁️</button>
-                            </div>
-                        </div>
-
-                        <div id="recoveryPhase2Message" class="recovery-message" style="display: none;"></div>
-
-                        <button class="btn-login" onclick="resetPasswordUI()">Update Password</button>
-
-                        <div class="switch-mode">
-                            <p><a href="#" onclick="switchToLogin()">Cancel</a></p>
-                        </div>
+                    <h3 style="text-align: center; color: #333; margin-bottom: 16px;">🔐 Forgot Password?</h3>
+                    <p style="text-align: center; color: #555; font-size: 0.9rem; line-height: 1.6; margin-bottom: 20px;">
+                        Password resets require administrator assistance.<br>
+                        Please contact your system administrator to reset your password.
+                    </p>
+                    <div class="switch-mode">
+                        <p><a href="#" onclick="switchToLogin()">Back to Sign In</a></p>
                     </div>
                 </div>
 
@@ -183,76 +134,18 @@
         </div>
     </div>
 
-    <!-- ACCOUNT RECOVERY MODAL - Full Screen Pop-up -->
-    <div id="recoveryModal" class="modal" style="display: none;"
-        onclick="if (event.target === this) closeRecoveryModal()">
-        <div class="modal-content" style="max-width: 450px; width: 100%;">
-            <div class="modal-header">
-                <h3>🔐 Account Recovery</h3>
-                <button class="btn-close" onclick="closeRecoveryModal()">&times;</button>
-            </div>
-            <div class="modal-body">
-                <div class="recovery-form">
-                    <!-- PHASE 1: Phone Verification -->
-                    <div id="recoveryPhase1" style="display: block;">
-                        <div class="form-group">
-                            <label>Username</label>
-                            <input type="text" id="recoveryUsername" placeholder="Your username" readonly
-                                style="background: #f5f5f5;">
-                        </div>
-                        <div class="form-group">
-                            <label>Phone Number *</label>
-                            <input type="text" id="recoveryPhoneNumber"
-                                placeholder="Enter your registered phone number">
-                            <small style="color: #666;">We'll verify your phone number to reset your password</small>
-                        </div>
-                        <div id="recoveryPhaseMessage" class="recovery-message" style="display: none;"></div>
-                    </div>
-
-                    <!-- PHASE 2: New Password Creation -->
-                    <div id="recoveryPhase2" style="display: none;">
-                        <div class="recovery-success-badge">✓ Phone Verified</div>
-                        <div class="form-group">
-                            <label>New Password *</label>
-                            <div class="password-input-wrapper">
-                                <input type="password" id="recoveryNewPassword"
-                                    placeholder="Enter new password (min 6 characters)">
-                                <button type="button" class="btn-toggle-password"
-                                    onclick="togglePasswordVisibility('recoveryNewPassword')">👁️</button>
-                            </div>
-                        </div>
-
-                        <div class="form-group">
-                            <label>Confirm Password *</label>
-                            <div class="password-input-wrapper">
-                                <input type="password" id="recoveryConfirmPassword" placeholder="Confirm new password">
-                                <button type="button" class="btn-toggle-password"
-                                    onclick="togglePasswordVisibility('recoveryConfirmPassword')">👁️</button>
-                            </div>
-                        </div>
-                        <div id="recoveryPasswordMessage" class="recovery-message" style="display: none;"></div>
-                    </div>
-                </div>
-            </div>
-            <div class="modal-footer">
-                <button class="btn-cancel" onclick="closeRecoveryModal()">Cancel</button>
-                <button class="btn-approve" id="recoverySubmitBtn" onclick="verifyPhoneNumber()">Verify Phone</button>
-            </div>
-        </div>
-    </div>
-
     <!-- JavaScript Files - FIXED PATHS (using / instead of ../) -->
-    <script src="https://cdn.socket.io/4.7.2/socket.io.min.js"></script>
     <script src="/js/utils/storage.js"></script>
     <script src="/js/utils/auth-guard.js"></script>
     <script src="/js/utils/notifications.js"></script>
     <script src="/js/utils/helpers.js"></script>
+    <script src="/js/utils/dialogs.js"></script>
     <script src="/js/auth/login.js"></script>
     <script src="/js/auth/register.js"></script>
 
     <script>
-        // Initialize Socket.io
-        const socket = io();
+        // Compatibility shim for legacy notification helpers.
+        const socket = { on: function () {}, connected: false };
 
         socket.on('connect', () => {
             console.log('✅ Connected to synchronization server');
@@ -265,7 +158,7 @@
         // Check for existing session on page load
         document.addEventListener('DOMContentLoaded', function () {
             // SECURITY: Redirect already-logged-in users away from login page
-            if (isAuthenticated()) {
+            if (false && isAuthenticated()) {
                 const user = getCurrentUser();
                 if (user) {
                     console.log('User already logged in, redirecting to dashboard');

@@ -29,15 +29,27 @@ function renderDatabaseTable() {
         const timeStr = date.toLocaleTimeString();
         const dateStr = date.toLocaleDateString();
 
+        const room = allRooms.find(r => r.id === log.roomId);
+        const category = room?.category || (log.roomId ? `Room ${log.roomId}` : '—');
+
+        const details = typeof log.details === 'object' && log.details !== null
+            ? Object.entries(log.details).map(([k, v]) => `${k}: ${v}`).join(', ')
+            : (log.details || '—');
+
+        const statusText = log.status || '';
+        const statusHtml = statusText
+            ? `<span class="log-status" style="background:${getStatusColor(statusText)};color:white;padding:4px 10px;border-radius:12px;">${statusText}</span>`
+            : '—';
+
         return `
         <tr>
             <td><span class="log-timestamp">${dateStr}<br>${timeStr}</span></td>
-            <td><strong>#${log.roomId}</strong></td>
-            <td><span class="log-action ${log.action}">${log.action.toUpperCase()}</span></td>
-            <td>${getInstructorFullName(log.user)}</td>
-            <td>${log.category}</td>
-            <td>${log.details}</td>
-            <td><span class="log-status" style="background: ${getStatusColor(log.status)}; color: white; padding: 4px 10px; border-radius: 12px;">${log.status}</span></td>
+            <td><strong>${log.roomId ? '#' + escapeHtml(String(log.roomId)) : '—'}</strong></td>
+            <td><span class="log-action ${escapeHtml(log.action)}">${escapeHtml(log.action.toUpperCase().replace(/_/g, ' '))}</span></td>
+            <td>${log.user === 'system' ? '<em style="color:#999">system</em>' : escapeHtml(getInstructorFullName(log.user) || log.user)}</td>
+            <td>${escapeHtml(category)}</td>
+            <td style="font-size:0.82rem;color:#555;">${details}</td>
+            <td>${statusHtml}</td>
         </tr>`;
     }).join('');
 
@@ -126,7 +138,7 @@ function updateDatabaseStats() {
 
     const registered = allRooms.filter(r => r.type === 'register' || !r.type).length;
     const scheduled = allRooms.filter(r => r.type === 'schedule').length;
-    const pending = pendingRequests.filter(r => r.status === 'pending').length;
+    const pending = roomRequests.filter(r => r.status === 'standby').length;
     const statusChanges = systemLogs.filter(l => l.action === 'status').length;
 
     if (registeredEl) registeredEl.innerText = registered;
@@ -146,13 +158,24 @@ function updateDatabaseStats() {
  * Export database as JSON file
  */
 function exportDatabase() {
-    const data = exportData();
+    const headers = ['Timestamp', 'Room No.', 'Action', 'User', 'Details'];
+    const rows = systemLogs.map(log => [
+        new Date(log.timestamp).toLocaleString(),
+        log.roomId ?? '',
+        log.action ?? '',
+        log.user ?? '',
+        typeof log.details === 'object' ? Object.entries(log.details || {}).map(([k,v]) => `${k}:${v}`).join('; ') : (log.details ?? '')
+    ]);
 
-    const blob = new Blob([JSON.stringify(data, null, 2)], { type: 'application/json' });
+    const csv = [headers, ...rows]
+        .map(row => row.map(cell => `"${String(cell).replace(/"/g, '""')}"`).join(','))
+        .join('\r\n');
+
+    const blob = new Blob(['﻿' + csv], { type: 'text/csv;charset=utf-8;' });
     const url = URL.createObjectURL(blob);
     const a = document.createElement('a');
     a.href = url;
-    a.download = `ctu_room_database_${new Date().toISOString().split('T')[0]}.json`;
+    a.download = `ctu_logs_${new Date().toISOString().split('T')[0]}.csv`;
     document.body.appendChild(a);
     a.click();
     document.body.removeChild(a);
@@ -162,19 +185,15 @@ function exportDatabase() {
 /**
  * Clear all logs with confirmation
  */
-function clearAllLogs() {
-    if (!confirm('WARNING: This will delete ALL system logs permanently!\n\nAre you sure you want to continue?')) {
-        return;
+async function clearAllLogs() {
+    if (!await showConfirm('Delete ALL system logs permanently? This cannot be undone.')) return;
+    try {
+        await apiFetch('/api/logs', { method: 'DELETE' });
+        await refreshData({ render: true, force: true });
+        showNotification('Logs Cleared', 'All system logs have been deleted.', 'success', 3000);
+    } catch (error) {
+        showToast(error.message, 'error');
     }
-
-    if (!confirm('FINAL WARNING: This action cannot be undone!\n\nDelete all logs?')) {
-        return;
-    }
-
-    clearAllLogsData();
-    renderDatabaseTable();
-    updateScheduleNotifications();
-    alert('All logs have been cleared.');
 }
 
 /**

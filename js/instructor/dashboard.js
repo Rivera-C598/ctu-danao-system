@@ -2,73 +2,331 @@
 CTU Room Management System - Instructor Dashboard
 ============================================ */
 
-// Current instructor tab
-let currentInstructorTab = 'available';
+let currentInstructorTab = 'myschedules';
 let selectedRoomForRequest = null;
 
-/**
- * Initialize instructor view
- */
 function initInstructorView() {
-    const session = getSession();
-    if (session) {
-        // Update desktop profile with full name
-        document.getElementById('instructorName').textContent = session.fullName || session.username;
-        // Update mobile profile with username
-        document.getElementById('mobileInstructorUsername').textContent = session.username || 'Instructor';
-    }
-
-    renderInstructorAvailableRooms();
+    updateInstructorHeader();
+    switchInstructorTab('myschedules');
     updateInstructorStats();
+    if (typeof startClock === 'function') startClock();
+}
 
-    // Set default room filter to 'all'
-    const filterSelect = document.getElementById('mobileRoomFilter');
-    if (filterSelect) {
-        filterSelect.value = 'all';
+function updateInstructorHeader() {
+    const session = getSession();
+    if (!session) return;
+    const name = session.fullName || session.username;
+    const el = document.getElementById('instructorName');
+    const mobileEl = document.getElementById('mobileInstructorUsername');
+    const avatarEl = document.getElementById('instructorAvatar');
+    const mobileAvatar = document.getElementById('mobileInstructorAvatar');
+    if (el) el.textContent = name;
+    if (mobileEl) mobileEl.textContent = name;
+    const avatarUrl = session.avatarUrl || null;
+    _setAvatarEl(avatarEl, name, avatarUrl);
+    if (mobileAvatar) {
+        if (avatarUrl) {
+            mobileAvatar.innerHTML = `<img src="${avatarUrl}" style="width:100%;height:100%;object-fit:cover;border-radius:50%;" onerror="this.parentNode.textContent='${name[0]?.toUpperCase()||'?'}'">`;
+            mobileAvatar.style.background = 'transparent';
+        } else {
+            const bg = typeof avatarColor === 'function' ? avatarColor(name) : '#c0392b';
+            mobileAvatar.style.background = bg;
+            mobileAvatar.style.color = 'white';
+            mobileAvatar.style.fontWeight = '700';
+            mobileAvatar.textContent = typeof avatarInitials === 'function' ? avatarInitials(name) : name[0]?.toUpperCase() || '?';
+        }
+    }
+    // navProfileIcon is the gear SVG — don't touch it
+}
+
+function renderSettingsTab() {
+    const session = getSession();
+    if (!session) return;
+    const name = session.fullName || session.username;
+    _setAvatarEl(document.getElementById('settingsAvatar'), name, session.avatarUrl || null);
+    const safe = (id, val) => { const el = document.getElementById(id); if (el) el.textContent = val; };
+    const setVal = (id, val) => { const el = document.getElementById(id); if (el) el.value = val; };
+    safe('settingsName', name);
+    safe('settingsUsername', '@' + session.username);
+    safe('settingsEmail', session.email || '');
+    setVal('settingsFullName', session.fullName || '');
+    setVal('settingsEmail2', session.email || '');
+    const msg = document.getElementById('settingsMsg');
+    if (msg) msg.style.display = 'none';
+}
+
+async function saveSettingsPassword() {
+    const current = document.getElementById('settingsCurrentPw')?.value;
+    const newPw   = document.getElementById('settingsNewPw')?.value;
+    const confirm = document.getElementById('settingsConfirmPw')?.value;
+    const msg     = document.getElementById('settingsPwMsg');
+    const setMsg  = (text, ok) => {
+        if (!msg) return;
+        msg.textContent = text;
+        msg.style.cssText = `display:block;background:rgba(${ok?'39,174,96':'231,76,60'},0.1);color:rgb(${ok?'39,174,96':'231,76,60'});font-size:0.82rem;padding:8px 12px;border-radius:8px;margin-bottom:10px;`;
+    };
+    if (!current || !newPw || !confirm) { setMsg('All password fields are required.', false); return; }
+    if (newPw.length < 6) { setMsg('New password must be at least 6 characters.', false); return; }
+    if (newPw !== confirm) { setMsg('Passwords do not match.', false); return; }
+    try {
+        await apiFetch('/api/auth/reset-password', { method: 'POST', body: JSON.stringify({ currentPassword: current, newPassword: newPw }) });
+        document.getElementById('settingsCurrentPw').value = '';
+        document.getElementById('settingsNewPw').value = '';
+        document.getElementById('settingsConfirmPw').value = '';
+        setMsg('✓ Password updated!', true);
+    } catch (err) { setMsg(err.message, false); }
+}
+
+async function saveSettingsProfile() {
+    const fullName = document.getElementById('settingsFullName')?.value.trim();
+    const email    = document.getElementById('settingsEmail2')?.value.trim();
+    const msg = document.getElementById('settingsMsg');
+    const setMsg = (text, ok) => {
+        if (!msg) return;
+        msg.textContent = text;
+        msg.style.cssText = `display:block;background:rgba(${ok?'39,174,96':'231,76,60'},0.1);color:rgb(${ok?'39,174,96':'231,76,60'});font-size:0.82rem;padding:8px 12px;border-radius:8px;margin-bottom:10px;`;
+    };
+    if (!fullName) { setMsg('Full name is required.', false); return; }
+    try {
+        const result = await apiFetch('/api/auth/profile', { method: 'PATCH', body: JSON.stringify({ fullName, email: email || null }) });
+        const session = getSession();
+        if (session) { session.fullName = result.user.fullName; session.email = result.user.email; saveSession(session); }
+        updateInstructorHeader();
+        renderSettingsTab();
+        setMsg('✓ Profile saved!', true);
+    } catch (err) { setMsg(err.message, false); }
+}
+
+function openProfileModal() {
+    const session = getSession();
+    if (!session) return;
+    const name = session.fullName || session.username;
+    const bg = typeof avatarColor === 'function' ? avatarColor(name) : '#c0392b';
+    const initials = typeof avatarInitials === 'function' ? avatarInitials(name) : name[0]?.toUpperCase() || '?';
+    const av = document.getElementById('profileAvatar');
+    _setAvatarEl(av, name, session.avatarUrl || null);
+    const unEl = document.getElementById('profileUsername');
+    if (unEl) unEl.textContent = '@' + session.username;
+    const fnEl = document.getElementById('profileFullName');
+    if (fnEl) fnEl.value = session.fullName || '';
+    const emEl = document.getElementById('profileEmail');
+    if (emEl) emEl.value = session.email || '';
+    const msg = document.getElementById('profileMsg');
+    if (msg) msg.style.display = 'none';
+    document.getElementById('profileModal')?.classList.remove('modal-hidden');
+}
+
+function closeProfileModal() {
+    document.getElementById('profileModal')?.classList.add('modal-hidden');
+}
+
+function _setAvatarEl(el, name, avatarUrl) {
+    if (!el) return;
+    const bg = typeof avatarColor === 'function' ? avatarColor(name) : '#c0392b';
+    const initials = typeof avatarInitials === 'function' ? avatarInitials(name) : (name[0]?.toUpperCase() || '?');
+    if (avatarUrl) {
+        el.innerHTML = `<img src="${avatarUrl}" style="width:100%;height:100%;object-fit:cover;border-radius:50%;" onerror="this.parentNode.textContent='${initials}'">`;
+        el.style.background = 'transparent';
+    } else {
+        el.innerHTML = initials;
+        el.style.background = bg;
+        el.style.color = 'white';
     }
 }
 
-/**
- * Switch instructor tab
- * @param {string} tab - Tab name ('available', 'myschedules', 'requests')
- */
+async function uploadAvatar(input) {
+    if (!input.files[0]) return;
+    // Find the nearest visible message container
+    const msgId = currentInstructorTab === 'settings' ? 'settingsMsg' : 'profileMsg';
+    const msg = document.getElementById(msgId);
+    const setMsg = (text, ok) => {
+        if (!msg) return;
+        msg.textContent = text;
+        msg.style.cssText = `display:block;background:rgba(${ok?'39,174,96':ok===null?'52,152,219':'231,76,60'},0.1);color:rgb(${ok?'39,174,96':ok===null?'52,152,219':'231,76,60'});font-size:0.82rem;padding:8px 12px;border-radius:8px;margin-top:8px;`;
+    };
+    setMsg('Uploading...', null);
+    const formData = new FormData();
+    formData.append('avatar', input.files[0]);
+    try {
+        const r = await fetch('/api/auth/avatar', { method: 'POST', credentials: 'include', body: formData });
+        const result = await r.json();
+        if (!r.ok || result.error) throw new Error(result.error || `Server error ${r.status}`);
+        const session = getSession();
+        if (session) { session.avatarUrl = result.avatarUrl; saveSession(session); }
+        // Update all avatar elements
+        const name = session?.fullName || session?.username || '';
+        _setAvatarEl(document.getElementById('profileAvatar'), name, result.avatarUrl);
+        _setAvatarEl(document.getElementById('settingsAvatar'), name, result.avatarUrl);
+        updateInstructorHeader();
+        if (currentInstructorTab === 'settings') renderSettingsTab();
+        setMsg('✓ Photo updated!', true);
+    } catch (err) {
+        console.error('Upload error:', err);
+        setMsg(err.message || 'Upload failed.', false);
+    }
+}
+
+async function saveProfile() {
+    const fullName = document.getElementById('profileFullName')?.value.trim();
+    const email    = document.getElementById('profileEmail')?.value.trim();
+    const msg = document.getElementById('profileMsg');
+    if (!fullName) {
+        if (msg) { msg.textContent = 'Full name is required.'; msg.style.cssText = 'display:block;background:rgba(231,76,60,0.1);color:#c0392b;font-size:0.82rem;padding:8px 12px;border-radius:8px;margin-top:8px;'; }
+        return;
+    }
+    try {
+        const result = await apiFetch('/api/auth/profile', {
+            method: 'PATCH',
+            body: JSON.stringify({ fullName, email: email || null })
+        });
+        // Update local session
+        const session = getSession();
+        if (session) { session.fullName = result.user.fullName; session.email = result.user.email; saveSession(session); }
+        updateInstructorHeader();
+        if (msg) { msg.textContent = '✓ Profile updated!'; msg.style.cssText = 'display:block;background:rgba(39,174,96,0.1);color:#27ae60;font-size:0.82rem;padding:8px 12px;border-radius:8px;margin-top:8px;'; }
+        setTimeout(closeProfileModal, 1200);
+    } catch (error) {
+        if (msg) { msg.textContent = error.message; msg.style.cssText = 'display:block;background:rgba(231,76,60,0.1);color:#c0392b;font-size:0.82rem;padding:8px 12px;border-radius:8px;margin-top:8px;'; }
+    }
+}
+
 function switchInstructorTab(tab) {
     currentInstructorTab = tab;
 
-    // Update mobile bottom nav active state
-    document.querySelectorAll('.nav-btn').forEach(btn => btn.classList.remove('active'));
-    document.querySelectorAll('.menu-btn').forEach(btn => btn.classList.remove('active'));
+    document.querySelectorAll('.nav-btn').forEach(b => b.classList.remove('active'));
+    document.querySelectorAll('.menu-btn').forEach(b => b.classList.remove('active'));
 
-    // Find the correct button based on tab
-    let activeBtn;
-    if (tab === 'available') {
-        activeBtn = document.querySelector('.nav-btn:first-child') || document.querySelector('.menu-btn:first-child');
-    } else if (tab === 'myschedules') {
-        activeBtn = document.querySelector('.nav-btn:nth-child(2)') || document.querySelector('.menu-btn:nth-child(2)');
-    } else if (tab === 'requests') {
-        activeBtn = document.querySelector('.nav-btn:nth-child(3)') || document.querySelector('.menu-btn:nth-child(3)');
-    }
+    ['mySchedulesTab','requestsTab','historyTab','settingsTab'].forEach(id => {
+        const el = document.getElementById(id);
+        if (el) el.style.display = 'none';
+    });
+    const fab = document.getElementById('floatingRequestBtn');
+    if (fab) fab.style.display = 'none';
 
-    if (activeBtn) {
-        activeBtn.classList.add('active');
-    }
-
-    // Hide all tabs
-    document.getElementById('availableTab').style.display = 'none';
-    document.getElementById('mySchedulesTab').style.display = 'none';
-    document.getElementById('requestsTab').style.display = 'none';
-
-    // Show selected tab
-    if (tab === 'available') {
-        document.getElementById('availableTab').style.display = 'block';
-        renderInstructorAvailableRooms();
-    } else if (tab === 'myschedules') {
+    if (tab === 'myschedules') {
         document.getElementById('mySchedulesTab').style.display = 'block';
+        document.getElementById('navBtnSchedule')?.classList.add('active');
+        document.getElementById('menuBtnSchedule')?.classList.add('active');
         renderMySchedules();
     } else if (tab === 'requests') {
         document.getElementById('requestsTab').style.display = 'block';
+        document.getElementById('navBtnRequests')?.classList.add('active');
+        document.getElementById('menuBtnRequests')?.classList.add('active');
+        if (typeof clearRequestsBadge === 'function') clearRequestsBadge();
         renderMyRequests();
+    } else if (tab === 'history') {
+        document.getElementById('historyTab').style.display = 'block';
+        document.getElementById('navBtnHistory')?.classList.add('active');
+        document.getElementById('menuBtnHistory')?.classList.add('active');
+        renderMyHistory();
+    } else if (tab === 'settings') {
+        document.getElementById('settingsTab').style.display = 'block';
+        document.getElementById('navBtnSettings')?.classList.add('active');
+        renderSettingsTab();
     }
+}
+
+/* ── Room Picker Sheet ── */
+function openRoomPicker() {
+    const sheet = document.getElementById('roomPickerSheet');
+    if (sheet) {
+        sheet.style.display = 'flex';
+        renderRoomPickerList('');
+        const input = document.getElementById('roomPickerSearch');
+        if (input) { input.value = ''; setTimeout(() => input.focus(), 100); }
+    }
+}
+
+function closeRoomPicker() {
+    const sheet = document.getElementById('roomPickerSheet');
+    if (sheet) sheet.style.display = 'none';
+}
+
+function filterRoomPicker(query) {
+    renderRoomPickerList(query);
+}
+
+function renderRoomPickerList(query) {
+    const list = document.getElementById('roomPickerList');
+    if (!list) return;
+    const q = (query || '').toLowerCase().trim();
+
+    const rooms = allRooms.filter(r => r.type !== 'schedule');
+    const filtered = rooms.filter(r => {
+        if (!q) return true;
+        return r.id.toString() === q || r.category.toLowerCase().includes(q);
+    });
+
+    if (filtered.length === 0) {
+        list.innerHTML = '<p style="text-align:center;color:#999;padding:20px;">No rooms found.</p>';
+        return;
+    }
+
+    const today = new Date().toISOString().split('T')[0];
+
+    list.innerHTML = filtered.map(room => {
+        const statusColor = {
+            Available:   'var(--green,#27ae60)',
+            Locked:      'var(--red,#c0392b)',
+            Meeting:     'var(--purple,#7b3fa0)',
+            Maintenance: 'var(--orange,#d4680a)'
+        }[room.status] || '#999';
+
+        // Booked slots today from room_schedules (active/standby)
+        const todaySlots = (room.schedules || [])
+            .filter(s => s.date === today)
+            .sort((a, b) => (a.startTime || '').localeCompare(b.startTime || ''));
+
+        // Also check pending requests for this room today (not yet approved but claimed)
+        const pendingSlots = (roomRequests || [])
+            .filter(r => r.roomId === room.id && r.date === today && r.status === 'pending')
+            .sort((a, b) => (a.startTime || '').localeCompare(b.startTime || ''));
+
+        const slotHTML = todaySlots.length === 0 && pendingSlots.length === 0
+            ? `<div style="font-size:11px;color:var(--green,#27ae60);margin-top:3px;">✓ No bookings today</div>`
+            : [
+                ...todaySlots.map(s => `<span style="display:inline-block;background:rgba(192,57,43,0.1);color:#c0392b;border-radius:4px;padding:1px 6px;font-size:10px;font-weight:600;margin:2px 2px 0 0;">${s.startTime}–${s.endTime}</span>`),
+                ...pendingSlots.map(s => `<span style="display:inline-block;background:rgba(243,156,18,0.1);color:#d4680a;border-radius:4px;padding:1px 6px;font-size:10px;font-weight:600;margin:2px 2px 0 0;">${s.startTime}–${s.endTime} ⏳</span>`)
+              ].join('');
+
+        const isBlocked = room.isRequestable === false;
+        const session = getSession();
+        const myUser = (session?.username || '').toLowerCase().trim();
+        const myTodaySlots = (roomRequests || []).filter(r =>
+            (r.instructor || '').toLowerCase().trim() === myUser &&
+            r.roomId === room.id && r.date === today &&
+            ['pending','active','standby'].includes(r.status)
+        );
+        const iMineAlready = myTodaySlots.length > 0;
+
+        return `
+        <div onclick="${isBlocked ? '' : `event.stopPropagation();selectRoomFromPicker(${room.id})`}" style="padding:14px 4px;border-bottom:1px solid var(--border,#f0f0f0);cursor:${isBlocked ? 'default' : 'pointer'};opacity:${isBlocked ? '0.6' : '1'};${iMineAlready ? 'background:rgba(243,156,18,0.05);' : ''}">
+            <div style="display:flex;align-items:center;justify-content:space-between;gap:12px;margin-bottom:4px;">
+                <div>
+                    <span style="font-weight:700;font-size:14px;">Room ${room.id}</span>
+                    <span style="font-size:12px;color:#888;margin-left:6px;">${room.category}</span>
+                    ${iMineAlready ? '<span style="margin-left:6px;background:rgba(243,156,18,0.15);color:#d4680a;border-radius:4px;padding:1px 6px;font-size:10px;font-weight:700;">⚠ Your booking</span>' : ''}
+                </div>
+                ${isBlocked
+                    ? '<span style="background:#e74c3c;color:white;padding:3px 10px;border-radius:12px;font-size:11px;font-weight:700;white-space:nowrap;flex-shrink:0;">🚫 Blocked</span>'
+                    : `<span style="background:${statusColor};color:white;padding:3px 10px;border-radius:12px;font-size:11px;font-weight:700;white-space:nowrap;flex-shrink:0;">${room.status}</span>`}
+            </div>
+            <div style="font-size:11px;color:#888;line-height:1.8;">${slotHTML}</div>
+        </div>`;
+    }).join('');
+}
+
+function selectRoomFromPicker(roomId) {
+    event.stopPropagation();
+    closeRoomPicker();
+    setTimeout(() => {
+        try {
+            openRequestModal(roomId);
+        } catch (err) {
+            console.error('openRequestModal failed:', err);
+            showToast('Error: ' + err.message, 'error');
+        }
+    }, 50);
 }
 
 /**
@@ -77,6 +335,7 @@ function switchInstructorTab(tab) {
 function renderInstructorAvailableRooms() {
     const grid = document.getElementById('availableRoomsGrid');
     const noData = document.getElementById('noAvailableRooms');
+    if (!grid) return; // element removed in new layout
 
     // Get all 'register' type rooms (skip 'schedule' duplicates)
     const displayRooms = allRooms.filter(room =>
@@ -92,7 +351,7 @@ function renderInstructorAvailableRooms() {
 
     noData.style.display = 'none';
 
-    grid.innerHTML = displayRooms.map(room => {
+    const newHTML = displayRooms.map(room => {
         const hasSchedules = room.schedules && room.schedules.length > 0;
         const isScheduled = hasSchedules;
         const hasConflict = isScheduled && checkTimeConflict(room);
@@ -156,7 +415,7 @@ function renderInstructorAvailableRooms() {
                 
                 <div class="room-actions">
                     <button class="btn-request" onclick="openRequestModal(${room.id})" ${hasConflict ? 'disabled' : ''}>
-                        Request your Schedule
+                        ${isScheduled ? '⏳ Join Queue' : 'Request Schedule'}
                     </button>
                     <button class="btn-view-schedule" onclick="viewRoomSchedule(${room.id})">
                         View Schedule
@@ -164,6 +423,9 @@ function renderInstructorAvailableRooms() {
                 </div>
             </div>`;
     }).join('');
+
+    // Only update DOM if content actually changed — prevents flicker on poll
+    if (grid.innerHTML !== newHTML) grid.innerHTML = newHTML;
 }
 
 /**
@@ -248,11 +510,11 @@ function renderScheduleTimeline(roomId) {
         // New format: schedules array
         daySchedules = room.schedules;
     } else {
-        // Legacy format: check pendingRequests
-        daySchedules = pendingRequests.filter(req =>
+        // API request rows include active/standby schedule records.
+        daySchedules = roomRequests.filter(req =>
             req.roomId === roomId &&
             req.date === dateStr &&
-            req.status === 'approved'
+            ['active', 'standby'].includes(req.status)
         ).map(req => ({
             instructor: req.instructor,
             startTime: req.startTime,
@@ -279,8 +541,8 @@ function renderScheduleTimeline(roomId) {
             </div>
             <div class="schedule-details">
                 ${index === 0 ? '<span style="color: #27ae60; font-weight: 600; font-size: 11px;">🟢 CURRENT</span>' : ''}
-                <span class="schedule-instructor">👤 ${schedule.instructor}</span>
-                <span class="schedule-purpose">${schedule.purpose || 'No description'}</span>
+                <span class="schedule-instructor">👤 ${escapeHtml(schedule.instructor)}</span>
+                <span class="schedule-purpose">${escapeHtml(schedule.purpose || 'No description')}</span>
             </div>
         </div>
     `).join('');
@@ -319,7 +581,7 @@ function viewRoomSchedule(roomId) {
                     </div>
                     <div class="date-picker">
                         <label>Year</label>
-                        <input type="number" class="date-input" id="viewScheduleYear" min="2026" value="${today.getFullYear()}">
+                        <input type="number" class="date-input" id="viewScheduleYear" min="${today.getFullYear()}" value="${today.getFullYear()}">
                     </div>
                     <button class="btn-search-schedule" onclick="renderScheduleTimeline(${roomId})">Show Schedule</button>
                 </div>
@@ -349,48 +611,6 @@ function closeViewScheduleModal() {
     }
 }
 
-/**
- * Render schedule timeline for selected date
- * @param {number} roomId - Room ID
- */
-function renderScheduleTimeline(roomId) {
-    const day = document.getElementById('viewScheduleDay').value;
-    const month = String(document.getElementById('viewScheduleMonth').value).padStart(2, '0');
-    const year = document.getElementById('viewScheduleYear').value;
-    const dateStr = `${year}-${month}-${String(day).padStart(2, '0')}`;
-
-    const timeline = document.getElementById('scheduleTimeline');
-    const noData = document.getElementById('noScheduleMessage');
-
-    // Get all schedules for this room on the selected date
-    const daySchedules = pendingRequests.filter(req =>
-        req.roomId === roomId &&
-        req.date === dateStr &&
-        req.status === 'approved'
-    ).sort((a, b) => a.startTime.localeCompare(b.startTime));
-
-    if (daySchedules.length === 0) {
-        timeline.innerHTML = '';
-        noData.style.display = 'block';
-        return;
-    }
-
-    noData.style.display = 'none';
-
-    timeline.innerHTML = daySchedules.map((schedule, index) => `
-        <div class="schedule-timeline-item">
-            <div class="schedule-time">
-                <span class="time-block">${schedule.startTime}</span>
-                <span class="time-separator">→</span>
-                <span class="time-block">${schedule.endTime}</span>
-            </div>
-            <div class="schedule-details">
-                <span class="schedule-instructor">👤 ${schedule.instructor}</span>
-                <span class="schedule-purpose">${schedule.purpose || 'No description'}</span>
-            </div>
-        </div>
-    `).join('');
-}
 
 /**
  * Open profile modal for editing user information
@@ -452,25 +672,28 @@ function closeProfileModal() {
 /**
  * Save profile changes
  */
-function saveProfile() {
-    const name = document.getElementById('profileName').value;
-    const email = document.getElementById('profileEmail').value;
-    const department = document.getElementById('profileDepartment').value;
-
-    // Update session storage
-    const session = getSession();
-    if (session) {
-        session.fullName = name;
-        session.email = email;
-        session.department = department;
-        saveSession(session);
-
-        // Update UI
-        document.getElementById('instructorName').textContent = name;
-        document.getElementById('mobileInstructorName').textContent = name;
-
+async function saveProfile() {
+    const name = document.getElementById('profileName').value.trim();
+    const email = document.getElementById('profileEmail').value.trim();
+    if (!name) return;
+    try {
+        const result = await apiFetch('/api/users/me', {
+            method: 'PATCH',
+            body: JSON.stringify({ fullName: name, email: email || null })
+        });
+        const session = getSession();
+        if (session) {
+            session.fullName = result.user.fullName;
+            session.email = result.user.email;
+            saveSession(session);
+        }
+        document.getElementById('instructorName').textContent = result.user.fullName;
+        const mobileNameEl = document.getElementById('mobileInstructorName');
+        if (mobileNameEl) mobileNameEl.textContent = result.user.fullName;
         showNotification('Profile Updated', 'Your profile has been updated successfully', 'success', 3000);
         closeProfileModal();
+    } catch (error) {
+        showToast(error.message, 'error');
     }
 }
 
@@ -481,10 +704,10 @@ function toggleNotifications() {
     const session = getSession();
     if (!session) return;
 
-    // Get user's pending and approved requests
-    const myRequests = pendingRequests.filter(r => r.instructor === session.username);
-    const pending = myRequests.filter(r => r.status === 'pending');
-    const approved = myRequests.filter(r => r.status === 'approved');
+    // Get user's standby and active requests.
+    const myRequests = roomRequests.filter(r => r.instructor === session.username);
+    const pending = myRequests.filter(r => r.status === 'standby');
+    const approved = myRequests.filter(r => r.status === 'active');
 
     let message = '';
 
@@ -520,9 +743,9 @@ function updateInstructorStats() {
     const session = getSession();
     if (!session) return;
 
-    const myRequests = pendingRequests.filter(r => r.instructor === session.username);
+    const myRequests = roomRequests.filter(r => r.instructor === session.username);
     const today = new Date().toISOString().split('T')[0];
-    const pending = myRequests.filter(r => r.status === 'pending').length;
+    const pending = myRequests.filter(r => r.status === 'standby').length;
 
     const activeSchedules = [];
     allRooms.forEach(room => {
@@ -537,10 +760,11 @@ function updateInstructorStats() {
 
     const approved = activeSchedules.length;
 
-    document.getElementById('instTotalRequests').textContent = myRequests.length;
-    document.getElementById('instApprovedCount').textContent = approved;
-    document.getElementById('myScheduleCount').textContent = approved;
-    document.getElementById('pendingRequestCount').textContent = pending;
+    const safe = (id, val) => { const el = document.getElementById(id); if (el) el.textContent = val; };
+    safe('instTotalRequests', myRequests.length);
+    safe('instApprovedCount', approved);
+    safe('myScheduleCount', approved);
+    safe('pendingRequestCount', pending);
 
     // Update mobile badges
     const pendingBadge = document.getElementById('pendingBadge');
@@ -564,7 +788,7 @@ function updateNotificationBadge() {
     const session = getSession();
     if (!session) return;
 
-    const pendingCount = pendingRequests.filter(r => r.instructor === session.username && r.status === 'pending').length;
+    const pendingCount = roomRequests.filter(r => r.instructor === session.username && r.status === 'standby').length;
     const notificationBadge = document.getElementById('notificationBadge');
 
     if (notificationBadge) {

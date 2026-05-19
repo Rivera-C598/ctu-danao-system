@@ -5,6 +5,36 @@
 // Current admin tab
 let currentTab = 'dashboard';
 
+// Pagination state
+const PAGE_SIZE = 10;
+const pageState = { rooms: 1, requests: 1, schedule: 1, users: 1 };
+
+function renderPagination(containerId, total, currentPage, onPageFn) {
+    const el = document.getElementById(containerId);
+    if (!el) return;
+    const totalPages = Math.ceil(total / PAGE_SIZE);
+    if (totalPages <= 1) { el.innerHTML = ''; return; }
+    const start = (currentPage - 1) * PAGE_SIZE + 1;
+    const end = Math.min(currentPage * PAGE_SIZE, total);
+    el.innerHTML = `
+        <span>${start}–${end} of ${total}</span>
+        <div class="pagination-controls">
+            <button class="pagination-btn" ${currentPage === 1 ? 'disabled' : ''} onclick="${onPageFn}(${currentPage - 1})">‹ Prev</button>
+            <span>Page ${currentPage} of ${totalPages}</span>
+            <button class="pagination-btn" ${currentPage === totalPages ? 'disabled' : ''} onclick="${onPageFn}(${currentPage + 1})">Next ›</button>
+        </div>`;
+}
+
+function paginateArray(arr, page) {
+    const start = (page - 1) * PAGE_SIZE;
+    return arr.slice(start, start + PAGE_SIZE);
+}
+
+function goRoomsPage(p)    { pageState.rooms    = p; renderTable(); }
+function goRequestsPage(p) { pageState.requests  = p; renderRequestsTable(); }
+function goSchedulePage(p) { pageState.schedule  = p; renderMonitoringTable(); }
+function goUsersPage(p)    { pageState.users     = p; renderUsersTable(); }
+
 /**
  * Initialize admin view
  */
@@ -13,6 +43,7 @@ function initAdminView() {
     updateStatusCounts();
     updateDatabaseStats();
     updateRequestsSidebar();
+    if (typeof startClock === 'function') startClock();
 }
 
 /**
@@ -31,6 +62,7 @@ function switchTab(tab) {
         dashboard: document.getElementById('dashboardSidebar'),
         monitoring: document.getElementById('monitoringSidebar'),
         requests: document.getElementById('requestsSidebar'),
+        users: document.getElementById('usersSidebar'),
         database: document.getElementById('databaseSidebar')
     };
 
@@ -38,6 +70,7 @@ function switchTab(tab) {
         dashboard: document.getElementById('dashboardView'),
         monitoring: document.getElementById('monitoringView'),
         requests: document.getElementById('requestsView'),
+        users: document.getElementById('usersView'),
         database: document.getElementById('databaseView')
     };
 
@@ -65,6 +98,8 @@ function switchTab(tab) {
         renderMonitoringTable();
     } else if (tab === 'requests') {
         renderRequestsTable('pending');
+    } else if (tab === 'users') {
+        renderUsersView();
     } else if (tab === 'database') {
         renderDatabaseTable();
     }
@@ -100,25 +135,12 @@ function updateStatusCounts() {
  * @param {string} status - Status to filter by
  */
 function filterByStatus(status) {
-    const rows = document.querySelectorAll('#tableBody tr');
-
-    rows.forEach((row, i) => {
-        const room = allRooms[i];
-        if (!room) {
-            row.style.display = "none";
-            return;
-        }
-
-        const roomStatus = room.status;
-        if (status === 'all' || roomStatus === status) {
-            row.style.display = "";
-        } else {
-            row.style.display = "none";
-        }
+    document.querySelectorAll('#tableBody tr').forEach(row => {
+        const rowStatus = row.dataset.status;
+        row.style.display = (status === 'all' || rowStatus === status) ? '' : 'none';
     });
-
-    const searchBar = document.getElementById('searchBar');
-    if (searchBar) searchBar.value = (status === 'all' ? "" : status);
+    const dropdown = document.getElementById('statusFilter');
+    if (dropdown) dropdown.value = status;
 }
 
 /**
@@ -134,259 +156,100 @@ function renderTable() {
         return;
     }
 
-    tbody.innerHTML = allRooms.map((room, index) => {
-        // Skip 'schedule' type rooms - they're duplicates, only show 'register' type
-        if (room.type === 'schedule') {
-            return '';
-        }
+    const allDisplayRooms = allRooms.filter(r => r.type !== 'schedule');
+    const pagedRooms = paginateArray(allDisplayRooms, pageState.rooms);
 
-        let statusClass = room.status === "Available" ? "bg-available" :
-            room.status === "Meeting" ? "bg-meeting" :
-                room.status === "Maintenance" ? "bg-maintenance" : "bg-locked";
+    tbody.innerHTML = pagedRooms.map((room) => {
+        const index = allRooms.indexOf(room);
+        if (room.type === 'schedule') return '';
 
-        const hasSchedules = room.schedules && room.schedules.length > 0;
-        const instructorUsername = hasSchedules ? room.schedules[0].instructor : room.instructor;
-        const instructorName = getInstructorFullName(instructorUsername);
-        const capitalizedName = instructorName ? instructorName.charAt(0).toUpperCase() + instructorName.slice(1) : '';
-        const scheduleInfo = hasSchedules ? `
-            <br><small style="color: var(--accent);">${room.schedules[0].date}</small>
-            <br><small style="font-size: 0.75rem; color: #666;">
-                <strong>Room Status:</strong> ${room.status}
-            </small>
-        ` : '';
+        const statusClass = room.status === 'Available' ? 'bg-available' :
+            room.status === 'Meeting' ? 'bg-meeting' :
+            room.status === 'Maintenance' ? 'bg-maintenance' : 'bg-locked';
+
+        const isRestricted = room.isRequestable === false;
+        const reqCount = (roomRequests || []).filter(r => r.roomId === room.id && ['pending','active','standby'].includes(r.status)).length;
 
         return `
-        <tr>
-            <td><input type="number" class="room-no-input" value="${room.id}" onchange="updateData(${index}, 'id', this.value)"></td>
+        <tr data-status="${room.status}">
+            <td><strong style="font-size:1.1rem;color:var(--primary);">${room.id}</strong></td>
             <td>
-                <input type="text" class="instructor-input" placeholder="Name..." value="${capitalizedName}" onchange="updateData(${index}, 'instructor', this.value)">
-                ${scheduleInfo}
-            </td>
-            <td>
-                <select class="cat-select" onchange="updateData(${index}, 'category', this.value)">
-                    ${CATEGORIES.map(cat => `<option value="${cat}" ${room.category === cat ? 'selected' : ''}>${cat}</option>`).join('')}
-                </select>
-            </td>
-            <td>
-                <div class="schedule-cell">
-                    <input type="date" class="sched-minimal" value="${room.date || ''}" onchange="updateData(${index}, 'date', this.value)">
-                    <div class="schedule-time-range">
-                        <input type="time" value="${room.startTime || ''}" onchange="updateData(${index}, 'startTime', this.value)">
-                        <span>-</span>
-                        <input type="time" value="${room.endTime || ''}" onchange="updateData(${index}, 'endTime', this.value)">
-                    </div>
-                    <span class="reset-link" onclick="resetSchedule(${index})">↺ Reset Sched</span>
-                </div>
+                <span style="font-weight:600;">${room.category}</span>
+                ${isRestricted ? '<br><span style="display:inline-block;margin-top:4px;background:#fce4ec;color:#c0392b;border-radius:4px;padding:2px 8px;font-size:11px;font-weight:700;">🚫 Requests Blocked</span>' : ''}
             </td>
             <td>
                 <select class="status-selector ${statusClass}" onchange="changeStatus(${index}, this.value)">
-                    <option value="Locked" ${room.status === 'Locked' ? 'selected' : ''}>🔒 LOCKED</option>
-                    <option value="Available" ${room.status === 'Available' ? 'selected' : ''}>🔓 AVAILABLE</option>
-                    <option value="Meeting" ${room.status === 'Meeting' ? 'selected' : ''}>👥 MEETING</option>
-                    <option value="Maintenance" ${room.status === 'Maintenance' ? 'selected' : ''}>⚙️ MAINTENANCE</option>
+                    <option value="Available" ${room.status === 'Available' ? 'selected' : ''}>🔓 Available</option>
+                    <option value="Locked"    ${room.status === 'Locked'    ? 'selected' : ''}>🔒 Locked</option>
+                    <option value="Meeting"   ${room.status === 'Meeting'   ? 'selected' : ''}>👥 Meeting</option>
+                    <option value="Maintenance" ${room.status === 'Maintenance' ? 'selected' : ''}>⚙️ Maintenance</option>
                 </select>
-                <details>
-                    <summary>▼ History (${room.history.length})</summary>
-                    <div style="margin-top:5px;">
-                        ${room.history.length > 0
-                ? room.history.slice(-4).reverse().map(h => `<div class="history-item">${h}</div>`).join('')
-                : '<div class="history-item" style="color:#999; font-style: italic;">No activity yet.</div>'}
-                        ${room.history.length > 0 ? `<span class="clear-history" onclick="clearHistory(${index})">🗑 Clear History</span>` : ''}
-                    </div>
-                </details>
             </td>
             <td>
-                ${hasSchedules && room.schedules[0] && room.schedules[0].queueStatus === 'active' ? `<button class="btn-complete" onclick="openCompleteSessionModal(${index})" title="Mark session as complete and activate next schedule">✓ Complete</button>` : ''}
-                <button class="btn-remove" onclick="removeRoom(${index})">Remove</button>
+                ${reqCount > 0
+                    ? `<button class="btn-outline-action" onclick="switchTab('requests')" title="View requests for Room ${room.id}">${reqCount} request${reqCount > 1 ? 's' : ''}</button>`
+                    : '<span style="color:#bbb;font-size:0.85rem;">—</span>'}
+            </td>
+            <td>
+                <div style="display:flex;gap:6px;flex-wrap:wrap;align-items:center;">
+                    <button class="${isRestricted ? 'btn-outline-action' : 'btn-danger-outline'}" onclick="toggleRoomRequestable(${room.id}, ${isRestricted ? 'true' : 'false'})">
+                        ${isRestricted ? '✓ Allow Requests' : '🚫 Block Requests'}
+                    </button>
+                    <button class="btn-danger-outline" onclick="removeRoom(${index})">Remove</button>
+                </div>
             </td>
         </tr>`;
     }).filter(row => row !== '').join('');
 
+    renderPagination('roomsPagination', allDisplayRooms.length, pageState.rooms, 'goRoomsPage');
     updateStatusCounts();
     updateMonitoringStats();
     updateScheduleNotifications();
 
-    updateStatusCounts();
-    updateMonitoringStats();
-    updateScheduleNotifications();
+    // Re-apply active status filter after re-render
+    const dropdown = document.getElementById('statusFilter');
+    if (dropdown && dropdown.value !== 'all') filterByStatus(dropdown.value);
 }
 
 /**
  * Filter table by search
  */
 function filterTable() {
-    const query = document.getElementById('searchBar').value.toLowerCase();
+    const query = document.getElementById('searchBar').value.toLowerCase().trim();
     const rows = document.querySelectorAll('#tableBody tr');
 
     rows.forEach((row, i) => {
         const room = allRooms[i];
-        if (!room) {
-            row.style.display = "none";
-            return;
-        }
+        if (!room) { row.style.display = 'none'; return; }
 
-        // Smart search: if query is a number, use exact room ID match. If text, use contains match
         let match = false;
-        if (/^\d+$/.test(query)) {
-            // Numeric search - exact room ID match only
-            match = room.id.toString() === query;
-        } else if (query) {
-            // Text search - match instructor or status only
-            match = (room.instructor && room.instructor.toLowerCase().includes(query)) ||
-                room.status.toLowerCase().includes(query);
-        } else {
-            // Empty search - show all
+        if (!query) {
             match = true;
+        } else if (/^\d+$/.test(query)) {
+            match = room.id.toString() === query;
+        } else {
+            const fullName = (room.schedules?.[0]?.instructorName || getInstructorFullName(room.instructor) || '').toLowerCase();
+            const username = (room.instructor || '').toLowerCase();
+            match = fullName.includes(query) ||
+                username.includes(query) ||
+                room.status.toLowerCase().includes(query) ||
+                room.category.toLowerCase().includes(query);
         }
 
-        row.style.display = match ? "" : "none";
+        row.style.display = match ? '' : 'none';
     });
-}
-
-/**
- * Update room data
- * @param {number} index - Room index
- * @param {string} field - Field to update
- * @param {string} value - New value
- */
-function updateData(index, field, value) {
-    const oldValue = allRooms[index][field];
-    allRooms[index][field] = field === 'id' ? parseInt(value) : value;
-
-    if (field === 'instructor' || field === 'category') {
-        addLog('update', allRooms[index].id, allRooms[index].instructor || 'Anonymous', allRooms[index].category, `${field}: ${oldValue} → ${value}`, allRooms[index].status);
-    }
-
-    saveToStorage();
-    updateStatusCounts();
-    updateScheduleNotifications();
-}
-
-/**
- * Change room status
- * @param {number} index - Room index
- * @param {string} newStatus - New status
- */
-function changeStatus(index, newStatus) {
-    const room = allRooms[index];
-    const oldStatus = room.status;
-    const time = new Date().toLocaleTimeString();
-
-    room.status = newStatus;
-    let icon = newStatus === "Available" ? "🔓" : newStatus === "Meeting" ? "👥" : newStatus === "Maintenance" ? "⚙️" : "🔒";
-    room.history.push(`${time} - ${icon} ${newStatus} by ${room.instructor || 'Anonymous'}`);
-
-    addLog('status', room.id, room.instructor || 'Anonymous', room.category, `Status: ${oldStatus} → ${newStatus}`, newStatus);
-
-    saveToStorage();
-    renderTable();
-    updateScheduleNotifications();
-}
-
-/**
- * Reset schedule for a room - clears all schedules and sets status to Available
- * @param {number} index - Room index
- */
-function resetSchedule(index) {
-    const room = allRooms[index];
-    const scheduleCount = room.schedules ? room.schedules.length : 0;
-
-    // Clear all schedules if they exist
-    if (room.schedules && room.schedules.length > 0) {
-        room.schedules = [];
-    }
-
-    // Clear date and time
-    room.date = "";
-    room.startTime = "";
-    room.endTime = "";
-
-    // Set status back to Available
-    room.status = 'Available';
-
-    // Convert to register type if needed
-    if (room.type === 'schedule') {
-        room.type = 'register';
-    }
-
-    const time = new Date().toLocaleTimeString();
-    const scheduleInfo = scheduleCount > 0 ? ` (${scheduleCount} schedule(s) cleared)` : '';
-    room.history.push(`${time} - ↺ Schedule reset by ${room.instructor || 'Anonymous'}${scheduleInfo}`);
-
-    addLog('reset', room.id, room.instructor || 'Anonymous', room.category, `Schedule reset${scheduleInfo} - Room set to Available`, 'Available');
-
-    saveToStorage();
-    renderTable();
-    updateScheduleNotifications();
-}
-
-/**
- * Clear all schedules from a room (instructor queue)
- * @param {number} index - Room index
- */
-function clearRoomSchedules(index) {
-    const room = allRooms[index];
-    if (!confirm(`Clear all schedules for Room ${room.id}? This will remove all instructors from the queue.`)) return;
-
-    const scheduleCount = room.schedules ? room.schedules.length : 0;
-    room.schedules = [];
-    room.date = "";
-    room.startTime = "";
-    room.endTime = "";
-    room.instructor = "";
-
-    const time = new Date().toLocaleTimeString();
-    room.history.push(`${time} - 🗑 Cleared ${scheduleCount} schedules`);
-
-    addLog('clear', room.id, 'Admin', room.category, `Cleared ${scheduleCount} instructor schedules`, room.status);
-
-    saveToStorage();
-    renderTable();
-    updateScheduleNotifications();
 }
 
 /**
  * Clear room history
  * @param {number} index - Room index
  */
-function clearHistory(index) {
-    if (confirm(`Clear all logs for Room ${allRooms[index].id}?`)) {
+async function clearHistory(index) {
+    if (await showConfirm(`Clear all logs for Room ${allRooms[index].id}?`)) {
         allRooms[index].history = [];
         saveToStorage();
         renderTable();
     }
-}
-
-/**
- * Remove a room
- * @param {number} index - Room index
- */
-function removeRoom(index) {
-    const room = allRooms[index];
-    if (!confirm("Remove this room/schedule?")) return;
-
-    const key = `${room.id}-${room.date}-${room.startTime}`;
-    if (scheduleStatus[key]) {
-        delete scheduleStatus[key];
-    }
-
-    const action = room.type === 'schedule' ? 'remove_schedule' : 'remove';
-    const details = room.type === 'schedule' ? `Schedule removed: ${room.date} ${room.startTime}-${room.endTime}` : 'Room unregistered';
-    addLog(action, room.id, room.instructor || 'Anonymous', room.category, details, room.status);
-
-    allRooms.splice(index, 1);
-
-    saveToStorage();
-
-    if (currentTab === 'dashboard') {
-        renderTable();
-    } else if (currentTab === 'monitoring') {
-        renderMonitoringTable();
-    } else {
-        renderDatabaseTable();
-    }
-
-    updateScheduleNotifications();
 }
 
 /**
@@ -396,7 +259,7 @@ function removeRoom(index) {
 function openCompleteSessionModal(index) {
     const room = allRooms[index];
     if (!room.schedules || room.schedules.length === 0) {
-        alert('No schedules found for this room');
+        showToast('No schedules found for this room', 'error');
         return;
     }
 
@@ -511,62 +374,6 @@ function closeCompleteSessionModal() {
     }
 }
 
-/**
- * Complete current session and activate next schedule
- * @param {number} index - Room index
- */
-function completeCurrentSession(index) {
-    const room = allRooms[index];
-    if (!room.schedules || room.schedules.length === 0) {
-        alert('No schedules found');
-        return;
-    }
-
-    const time = new Date().toLocaleTimeString();
-    const currentSchedule = room.schedules[0];
-    const currentInstructor = currentSchedule.instructor;
-
-    // Mark current session as completed
-    currentSchedule.queueStatus = 'completed';
-    const completionTime = new Date().toLocaleString();
-    currentSchedule.completedAt = completionTime;
-
-    // Log the completion
-    room.history.push(`${time} - ✓ Session completed by ${currentInstructor}`);
-
-    // If there's a next schedule, activate it
-    let nextInstructor = null;
-    if (room.schedules.length > 1) {
-        const nextSchedule = room.schedules[1];
-        nextSchedule.queueStatus = 'active';
-        nextInstructor = nextSchedule.instructor;
-
-        // Update room info to reflect next active instructor
-        room.instructor = nextInstructor;
-        room.status = nextSchedule.requestedRoomStatus || 'Meeting';  // Use the next schedule's requested status
-
-        room.history.push(`${time} - 👥 Next schedule activated for ${nextInstructor}`);
-
-        addLog('schedule_completed', room.id, currentInstructor, room.category,
-            `Session completed. Next: ${nextInstructor} (${nextSchedule.startTime}-${nextSchedule.endTime})`, room.status);
-    } else {
-        // No more schedules - mark room as available
-        room.status = 'Available';
-        room.instructor = '';
-        room.history.push(`${time} - 🔓 No more schedules - room marked as Available`);
-
-        addLog('schedule_completed', room.id, currentInstructor, room.category,
-            'Session completed. Room is now available.', 'Available');
-    }
-
-    saveToStorage();
-    renderTable();
-    updateScheduleNotifications();
-    closeCompleteSessionModal();
-
-    // Send notifications
-    notifySessionCompletion(room, currentInstructor, nextInstructor);
-}
 
 /**
  * Send notifications for session completion
@@ -597,15 +404,14 @@ function notifySessionCompletion(room, currentInstructor, nextInstructor) {
         }
     }
 
-    // Also show browser alert for immediate feedback
+    // Also show toast for immediate feedback
     let alertMsg = `✓ Session completed for ${currentInstructor} in Room ${room.id}!`;
     if (nextInstructor) {
-        alertMsg += `\n\n👥 ${nextInstructor}'s session is now active!`;
-        alertMsg += `\nRoom is ready to be used.`;
+        alertMsg += ` 👥 ${nextInstructor}'s session is now active!`;
     } else {
-        alertMsg += '\n\n🔓 Room is now available.';
+        alertMsg += ' 🔓 Room is now available.';
     }
-    alert(alertMsg);
+    showToast(alertMsg, 'success');
 }
 
 /**
@@ -615,7 +421,7 @@ function notifySessionCompletion(room, currentInstructor, nextInstructor) {
 function activateNextSchedule(index) {
     const room = allRooms[index];
     if (!room.schedules || room.schedules.length < 2) {
-        alert('No next schedule available');
+        showToast('No next schedule available', 'error');
         return;
     }
 
@@ -655,21 +461,21 @@ function activateNextSchedule(index) {
         );
     }
 
-    alert(`✓ Next schedule activated!\n\n${nextInstructor} can now use Room ${room.id}.\nTime: ${nextSchedule.startTime} - ${nextSchedule.endTime}`);
+    showToast(`✓ Next schedule activated! ${nextInstructor} can now use Room ${room.id}.`, 'success');
 }
 
 /**
  * Remove next schedule and notify the instructor
  * @param {number} index - Room index
  */
-function removeNextSchedule(index) {
+async function removeNextSchedule(index) {
     const room = allRooms[index];
     if (!room.schedules || room.schedules.length < 2) {
-        alert('No next schedule available to remove');
+        showToast('No next schedule available to remove', 'error');
         return;
     }
 
-    if (!confirm('Remove the next instructor\'s schedule? They will be notified.')) {
+    if (!await showConfirm('Remove the next instructor\'s schedule? They will be notified.')) {
         return;
     }
 
@@ -700,7 +506,7 @@ function removeNextSchedule(index) {
         );
     }
 
-    alert(`✓ Schedule removed!\n\n${nextInstructor}'s schedule in Room ${room.id} has been cancelled.\nThey will be notified of this change.`);
+    showToast(`✓ Schedule removed! ${nextInstructor}'s schedule in Room ${room.id} has been cancelled.`, 'success');
 }
 
 /**
@@ -710,7 +516,7 @@ function removeNextSchedule(index) {
 function completeFinalSession(index) {
     const room = allRooms[index];
     if (!room.schedules || room.schedules.length === 0) {
-        alert('No schedule found');
+        showToast('No schedule found', 'error');
         return;
     }
 
@@ -753,7 +559,7 @@ function completeFinalSession(index) {
         );
     }
 
-    alert(`✓ Session completed!\n\n${instructorName}'s session in Room ${room.id} has finished.\nRoom is now Available.`);
+    showToast(`✓ Session completed! ${instructorName}'s session in Room ${room.id} has finished. Room is now Available.`, 'success');
 }
 
 /**
@@ -865,7 +671,8 @@ function checkAdminPasswordMatch() {
 /**
  * Create new admin account
  */
-function createAdminAccount() {
+// Legacy localStorage implementation kept temporarily for reference; UI calls the API-backed createAdminAccount below.
+function legacyCreateAdminAccount() {
     const username = document.getElementById('adminUsername').value.trim().toLowerCase();
     const fullName = document.getElementById('adminFullName').value.trim();
     const email = document.getElementById('adminEmail').value.trim();
@@ -925,8 +732,8 @@ function createAdminAccount() {
         loginCount: 0
     };
 
-    usersDatabase.push(newAdmin);
-    saveUsersDatabase();
+    console.warn('legacyCreateAdminAccount is disabled; use the API-backed createAdminAccount implementation.');
+    return;
 
     // Show success message
     messageEl.innerHTML = `<span style="color: #4caf50;">✓ Admin account created successfully!</span><br><strong>Username:</strong> ${username}<br><strong>Name:</strong> ${fullName}`;
@@ -966,4 +773,359 @@ if (typeof module !== 'undefined' && module.exports) {
         removeNextSchedule,
         completeFinalSession
     };
+}
+
+function renderUsersView() {
+    renderRegistrationCodes();
+    renderUsersTable();
+    const instructors = usersDatabase.filter(u => u.role === 'instructor');
+    const unused = registrationCodes.filter(c => !c.usedAt && !c.revokedAt);
+    const totalEl = document.getElementById('totalUsersCount');
+    const instrEl = document.getElementById('instructorCount');
+    const unusedEl = document.getElementById('unusedCodesCount');
+    if (totalEl) totalEl.textContent = usersDatabase.length;
+    if (instrEl) instrEl.textContent = instructors.length;
+    if (unusedEl) unusedEl.textContent = unused.length;
+}
+
+function renderUsersTable() {
+    const tbody = document.getElementById('usersTableBody');
+    const noMsg = document.getElementById('noUsersMsg');
+    if (!tbody) return;
+    const instructors = usersDatabase.filter(u => u.role === 'instructor');
+    if (instructors.length === 0) {
+        tbody.innerHTML = '';
+        if (noMsg) noMsg.style.display = 'block';
+        return;
+    }
+    if (noMsg) noMsg.style.display = 'none';
+    const totalUsers = instructors.length;
+    const usrPage = pageState.users || 1;
+    const pagedUsers = paginateArray(instructors, usrPage);
+
+    tbody.innerHTML = pagedUsers.map(u => {
+        const lastLogin = u.lastLogin ? new Date(u.lastLogin).toLocaleString('en-PH', { dateStyle: 'medium', timeStyle: 'short' }) : '—';
+        const uName = u.fullName || u.username || '?';
+        const uBg = typeof avatarColor === 'function' ? avatarColor(uName) : 'var(--primary)';
+        const uInitials = typeof avatarInitials === 'function' ? avatarInitials(uName) : uName[0].toUpperCase();
+        return `
+        <tr>
+            <td>
+                <div style="display:flex;align-items:center;gap:10px;">
+                    ${u.avatarUrl
+                        ? `<img src="${u.avatarUrl}" style="width:34px;height:34px;border-radius:50%;object-fit:cover;flex-shrink:0;" onerror="this.style.display='none'">`
+                        : `<div style="width:34px;height:34px;border-radius:50%;background:${uBg};color:white;display:flex;align-items:center;justify-content:center;font-weight:700;font-size:0.85rem;flex-shrink:0;">${uInitials}</div>`}
+                    <div>
+                        <div style="font-weight:600;">${u.fullName || '—'}</div>
+                        <div style="font-size:0.78rem;color:#888;">@${u.username}</div>
+                    </div>
+                </div>
+            </td>
+            <td>${u.email || '—'}</td>
+            <td>${lastLogin}</td>
+            <td><span style="font-weight:600;">${u.loginCount || 0}</span></td>
+            <td><button class="btn-outline-action" onclick="adminResetPassword('${u.id}', '${u.username}')">Reset Password</button></td>
+        </tr>`;
+    }).join('');
+    renderPagination('usersPagination', totalUsers, usrPage, 'goUsersPage');
+}
+
+async function adminResetPassword(userId, username) {
+    const newPassword = await showPromptDialog('Set new password', { title: 'Reset Password for ' + username, placeholder: 'Min 6 characters' });
+    if (!newPassword) return;
+    if (newPassword.length < 6) {
+        showToast('Password must be at least 6 characters.', 'error');
+        return;
+    }
+    try {
+        await apiFetch(`/api/admin/users/${userId}/reset-password`, {
+            method: 'POST',
+            body: JSON.stringify({ newPassword })
+        });
+        showToast(`Password for "${username}" has been reset.`, 'success');
+    } catch (error) {
+        showToast(error.message, 'error');
+    }
+}
+
+// API-mode overrides. These replace legacy full-state mutations declared above.
+async function updateData(index, field, value) {
+    const room = allRooms[index];
+    if (!room) return;
+    if (field === 'id' || field === 'instructor' || field === 'date' || field === 'startTime' || field === 'endTime') {
+        showToast('Direct schedule/room-number edits are disabled in database mode. Use requests or recreate the room.', 'error');
+        await refreshData({ render: true });
+        return;
+    }
+    try {
+        await apiFetch(`/api/rooms/${room.id}`, {
+            method: 'PATCH',
+            body: JSON.stringify({ [field]: value })
+        });
+        await refreshData({ render: true });
+    } catch (error) {
+        showToast(error.message, 'error');
+        await refreshData({ render: true });
+    }
+}
+
+async function changeStatus(index, newStatus) {
+    const room = allRooms[index];
+    if (!room) return;
+    if (!await showConfirm(`Change Room ${room.id} status to "${newStatus}"?`)) {
+        await refreshData({ render: true });
+        return;
+    }
+    try {
+        await apiFetch(`/api/rooms/${room.id}`, {
+            method: 'PATCH',
+            body: JSON.stringify({ status: newStatus })
+        });
+        await refreshData({ render: true });
+    } catch (error) {
+        showToast(error.message, 'error');
+        await refreshData({ render: true });
+    }
+}
+
+async function toggleRoomRequestable(roomNumber, isRequestable) {
+    try {
+        await apiFetch(`/api/rooms/${roomNumber}`, {
+            method: 'PATCH',
+            body: JSON.stringify({ isRequestable })
+        });
+        await refreshData({ render: true });
+    } catch (error) {
+        showToast(error.message, 'error');
+    }
+}
+
+async function resetSchedule(index) {
+    const room = allRooms[index];
+    if (!room) return;
+    if (!await showConfirm(`Cancel active/standby schedules for Room ${room.id}?`)) return;
+    try {
+        for (const schedule of room.schedules || []) {
+            if (schedule.requestId) {
+                await apiFetch(`/api/requests/${schedule.requestId}`, { method: 'DELETE' });
+            }
+        }
+        await apiFetch(`/api/rooms/${room.id}`, {
+            method: 'PATCH',
+            body: JSON.stringify({ status: 'Available' })
+        });
+        await refreshData({ render: true });
+    } catch (error) {
+        showToast(error.message, 'error');
+    }
+}
+
+function clearRoomSchedules(index) {
+    resetSchedule(index);
+}
+
+async function removeRoom(index) {
+    const room = allRooms[index];
+    if (!room || !await showConfirm('Remove this room?')) return;
+    try {
+        await apiFetch(`/api/rooms/${room.id}`, { method: 'DELETE' });
+        await refreshData({ render: true });
+    } catch (error) {
+        showToast(error.message, 'error');
+    }
+}
+
+async function completeCurrentSession(index) {
+    const room = allRooms[index];
+    const active = room?.schedules?.find(schedule => schedule.queueStatus === 'active') || room?.schedules?.[0];
+    if (!active) { showToast('No active schedule found', 'error'); return; }
+    try {
+        await apiFetch(`/api/schedules/${active.id}/done`, { method: 'POST', body: '{}' });
+        await refreshData({ render: true });
+        closeCompleteSessionModal();
+        showToast('Session completed.', 'success');
+    } catch (error) {
+        showToast(error.message, 'error');
+    }
+}
+
+function activateNextSchedule(index) {
+    completeCurrentSession(index);
+}
+
+async function removeNextSchedule(index) {
+    const room = allRooms[index];
+    const next = room?.schedules?.find(schedule => schedule.queueStatus === 'standby') || room?.schedules?.[1];
+    if (!next || !next.requestId) { showToast('No next schedule available to remove', 'error'); return; }
+    if (!await showConfirm('Remove the next instructor schedule?')) return;
+    try {
+        await apiFetch(`/api/requests/${next.requestId}`, { method: 'DELETE' });
+        await refreshData({ render: true });
+        closeCompleteSessionModal();
+    } catch (error) {
+        showToast(error.message, 'error');
+    }
+}
+
+function completeFinalSession(index) {
+    completeCurrentSession(index);
+}
+
+let _codesFilter = 'unused';
+
+async function createRegistrationCode() {
+    if (!await showConfirm('Generate a new registration code?', { confirmText: 'Generate', confirmStyle: 'background:#27ae60;color:white;' })) return;
+    try {
+        const result = await apiFetch('/api/registration-codes', { method: 'POST', body: '{}' });
+        await refreshData({ render: true });
+        // Show result with copy button
+        const overlay = document.createElement('div');
+        overlay.style.cssText = 'position:fixed;inset:0;background:rgba(0,0,0,0.5);z-index:9999;display:flex;align-items:center;justify-content:center;padding:16px;';
+        overlay.innerHTML = `
+            <div style="background:white;border-radius:14px;padding:28px;max-width:360px;width:100%;text-align:center;box-shadow:0 8px 40px rgba(0,0,0,0.25);">
+                <div style="font-size:2rem;margin-bottom:12px;">🎉</div>
+                <div style="font-weight:700;font-size:1rem;margin-bottom:6px;">Code Generated!</div>
+                <div style="font-size:0.85rem;color:#666;margin-bottom:16px;">Share this one-time code with the instructor.</div>
+                <div style="background:#f5f5f5;border-radius:8px;padding:14px;font-family:monospace;font-size:1.2rem;font-weight:700;color:var(--primary,#c0392b);letter-spacing:0.05em;margin-bottom:16px;">${result.code}</div>
+                <div style="display:flex;gap:10px;">
+                    <button onclick="navigator.clipboard.writeText('${result.code}').then(()=>this.textContent='✓ Copied!')" style="flex:1;padding:10px;border:1.5px solid #ddd;background:white;border-radius:8px;cursor:pointer;font-weight:600;">📋 Copy</button>
+                    <button onclick="this.closest('div[style*=fixed]').remove()" style="flex:1;padding:10px;border:none;background:var(--primary,#c0392b);color:white;border-radius:8px;cursor:pointer;font-weight:700;">Done</button>
+                </div>
+            </div>`;
+        document.body.appendChild(overlay);
+    } catch (error) {
+        showToast(error.message, 'error');
+    }
+}
+
+async function revokeRegistrationCode(id) {
+    if (!await showConfirm('Revoke this code? The instructor will no longer be able to use it.', {
+        confirmText: 'Revoke', confirmStyle: 'background:#e74c3c;color:white;', title: 'Revoke Code'
+    })) return;
+    try {
+        await apiFetch(`/api/registration-codes/${id}`, { method: 'DELETE' });
+        await refreshData({ render: true });
+        showToast('Code revoked.', 'info');
+    } catch (error) {
+        showToast(error.message, 'error');
+    }
+}
+
+async function deleteRevokedCode(id) {
+    if (!await showConfirm('Permanently delete this revoked code? This cannot be undone.', {
+        confirmText: 'Delete', confirmStyle: 'background:#e74c3c;color:white;'
+    })) return;
+    try {
+        await apiFetch(`/api/registration-codes/${id}/permanent`, { method: 'DELETE' });
+        await refreshData({ render: true });
+        showToast('Code permanently deleted.', 'success');
+    } catch (error) {
+        showToast(error.message, 'error');
+    }
+}
+
+function setCodesFilter(f) {
+    _codesFilter = f;
+    document.querySelectorAll('.codes-filter-btn').forEach(b => b.classList.toggle('active', b.dataset.f === f));
+    renderRegistrationCodes(1);
+}
+
+let codesPage = 1;
+const CODES_PER_PAGE = 8;
+
+function renderRegistrationCodes(page) {
+    if (page) codesPage = page;
+    const container = document.getElementById('registrationCodesList');
+    if (!container) return;
+
+    const all = registrationCodes || [];
+    const filtered = all.filter(c => {
+        if (_codesFilter === 'unused')  return !c.usedAt && !c.revokedAt;
+        if (_codesFilter === 'used')    return !!c.usedAt;
+        if (_codesFilter === 'revoked') return !!c.revokedAt;
+        return true;
+    });
+
+    if (all.length === 0) {
+        container.innerHTML = '<p style="color:#999;font-size:0.9rem;">No codes yet.</p>';
+        return;
+    }
+
+    const totalPages = Math.ceil(filtered.length / CODES_PER_PAGE);
+    const pageCodes  = filtered.slice((codesPage - 1) * CODES_PER_PAGE, codesPage * CODES_PER_PAGE);
+
+    const rows = pageCodes.length === 0
+        ? '<p style="color:#999;font-size:0.85rem;padding:8px 0;">No codes in this category.</p>'
+        : pageCodes.map(code => {
+            const isUsed    = !!code.usedAt;
+            const isRevoked = !!code.revokedAt;
+            const badge = isUsed
+                ? `<span class="badge-used">✓ Used by ${code.usedBy || 'unknown'}</span>`
+                : isRevoked
+                ? `<span class="badge-revoked">✕ Revoked</span>`
+                : `<span class="badge-unused">● Unused</span>`;
+            const meta = isUsed
+                ? `Used ${new Date(code.usedAt).toLocaleDateString()}`
+                : isRevoked
+                ? `Revoked ${new Date(code.revokedAt).toLocaleDateString()}`
+                : 'Ready to share';
+            const actions = isRevoked
+                ? `<button class="btn-danger-outline" style="padding:4px 10px;font-size:0.78rem;" onclick="deleteRevokedCode('${code.id}')">Delete</button>`
+                : !isUsed
+                ? `<button onclick="navigator.clipboard.writeText('${code.code}').then(()=>this.textContent='✓')" style="padding:4px 8px;font-size:0.78rem;border:1.5px solid #ddd;background:white;border-radius:6px;cursor:pointer;" title="Copy code">📋</button>
+                   <button class="btn-danger-outline" style="padding:4px 10px;font-size:0.78rem;" onclick="revokeRegistrationCode('${code.id}')">Revoke</button>`
+                : '';
+            return `
+                <div class="reg-code-item">
+                    <div>
+                        <div class="reg-code-text">${code.code}</div>
+                        <div class="reg-code-meta">${meta}</div>
+                    </div>
+                    <div style="display:flex;align-items:center;gap:8px;">${badge}${actions}</div>
+                </div>`;
+        }).join('');
+
+    const pagination = totalPages > 1 ? `
+        <div class="table-pagination" style="margin-top:10px;">
+            <span>${filtered.length} code${filtered.length !== 1 ? 's' : ''}</span>
+            <div class="pagination-controls">
+                <button class="pagination-btn" ${codesPage === 1 ? 'disabled' : ''} onclick="renderRegistrationCodes(${codesPage - 1})">‹</button>
+                <span>${codesPage} / ${totalPages}</span>
+                <button class="pagination-btn" ${codesPage === totalPages ? 'disabled' : ''} onclick="renderRegistrationCodes(${codesPage + 1})">›</button>
+            </div>
+        </div>` : `<div style="font-size:0.78rem;color:#999;margin-top:6px;">${filtered.length} code${filtered.length !== 1 ? 's' : ''}</div>`;
+
+    container.innerHTML = rows + pagination;
+}
+
+async function createAdminAccount() {
+    const username = document.getElementById('adminUsername').value.trim().toLowerCase();
+    const fullName = document.getElementById('adminFullName').value.trim();
+    const email = document.getElementById('adminEmail').value.trim();
+    const password = document.getElementById('adminPassword').value;
+    const confirmPassword = document.getElementById('adminConfirmPassword').value;
+    const messageEl = document.getElementById('adminCreateMessage');
+
+    if (!username || username.length < 3 || !fullName || password.length < 6 || password !== confirmPassword) {
+        messageEl.textContent = 'Please complete the form and make sure passwords match.';
+        messageEl.style.color = '#d32f2f';
+        messageEl.style.display = 'block';
+        return;
+    }
+
+    try {
+        await apiFetch('/api/admin/users', {
+            method: 'POST',
+            body: JSON.stringify({ username, fullName, email: email || null, password, role: 'admin' })
+        });
+        await refreshData({ render: true });
+        messageEl.textContent = 'Admin account created successfully.';
+        messageEl.style.color = '#4caf50';
+        messageEl.style.display = 'block';
+        setTimeout(closeCreateAdminModal, 1000);
+    } catch (error) {
+        messageEl.textContent = error.message;
+        messageEl.style.color = '#d32f2f';
+        messageEl.style.display = 'block';
+    }
 }
