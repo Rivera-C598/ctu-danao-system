@@ -85,118 +85,26 @@
                 </div>
             </div>
 
-            <div class="sidebar-action">
-                <button class="btn-quick-register" onclick="openQuickRegisterModal()">+ Quick Register</button>
-            </div>
-
             <!-- Dashboard Sidebar -->
-            <div class="status-cards" id="dashboardSidebar">
-                <div class="status-card card-all" onclick="filterByStatus('all')">
-                    <span class="status-label">All Rooms</span>
-                    <span class="status-count" id="countAll">0</span>
-                </div>
-                <div class="status-card card-available" onclick="filterByStatus('Available')">
-                    <span class="status-label">Available</span>
-                    <span class="status-count" id="countAvailable">0</span>
-                </div>
-                <div class="status-card card-locked" onclick="filterByStatus('Locked')">
-                    <span class="status-label">Locked</span>
-                    <span class="status-count" id="countLocked">0</span>
-                </div>
-                <div class="status-card card-meeting" onclick="filterByStatus('Meeting')">
-                    <span class="status-label">Meeting</span>
-                    <span class="status-count" id="countMeeting">0</span>
-                </div>
-                <div class="status-card card-maintenance" onclick="filterByStatus('Maintenance')">
-                    <span class="status-label">Maintenance</span>
-                    <span class="status-count" id="countMaintenance">0</span>
-                </div>
-                <button class="btn-create-admin" onclick="openCreateAdminModal()" style="margin-top:15px;">Create Admin</button>
-            </div>
+            <div class="status-cards" id="dashboardSidebar"></div>
 
-            <!-- Requests Sidebar -->
-            <div class="requests-sidebar" id="requestsSidebar" style="display:none;">
-                <div class="requests-info-box">
-                    <h4>📋 Pending Requests</h4>
-                    <p>Manage instructor room requests</p>
-                    <div class="requests-stats">
-                        <div class="stat-item">
-                            <span class="stat-label">Pending:</span>
-                            <span class="stat-value" id="pendingCountSidebar">0</span>
-                        </div>
-                        <div class="stat-item">
-                            <span class="stat-label">Approved:</span>
-                            <span class="stat-value" id="approvedTodaySidebar">0</span>
-                        </div>
-                        <div class="stat-item">
-                            <span class="stat-label">Rejected:</span>
-                            <span class="stat-value" id="rejectedTodaySidebar">0</span>
-                        </div>
-                    </div>
-                </div>
+            <!-- Hidden stat elements kept for JS compatibility -->
+            <div style="display:none;">
+                <span id="pendingCountSidebar">0</span>
+                <span id="approvedTodaySidebar">0</span>
+                <span id="rejectedTodaySidebar">0</span>
+                <span id="totalScheduled">0</span>
+                <span id="activeToday">0</span>
+                <span id="totalUsersCount">0</span>
+                <span id="instructorCount">0</span>
+                <span id="unusedCodesCount">0</span>
+                <span id="totalLogs">0</span>
+                <span id="todayActivity">0</span>
             </div>
-
-            <!-- Monitoring Sidebar -->
-            <div class="monitoring-sidebar" id="monitoringSidebar" style="display:none;">
-                <div class="monitoring-info-box">
-                    <h4>📊 Schedule Overview</h4>
-                    <p>View all scheduled rooms and booking details.</p>
-                    <div class="monitoring-stats">
-                        <div class="stat-item">
-                            <span class="stat-label">Total Scheduled:</span>
-                            <span class="stat-value" id="totalScheduled">0</span>
-                        </div>
-                        <div class="stat-item">
-                            <span class="stat-label">Active Today:</span>
-                            <span class="stat-value" id="activeToday">0</span>
-                        </div>
-                    </div>
-                </div>
-            </div>
-
-            <!-- Users Sidebar -->
-            <div class="users-sidebar" id="usersSidebar" style="display:none;">
-                <div class="requests-info-box">
-                    <h4>👤 User Management</h4>
-                    <p>Manage instructor accounts and registration codes.</p>
-                    <div class="requests-stats">
-                        <div class="stat-item">
-                            <span class="stat-label">Total Users:</span>
-                            <span class="stat-value" id="totalUsersCount">0</span>
-                        </div>
-                        <div class="stat-item">
-                            <span class="stat-label">Instructors:</span>
-                            <span class="stat-value" id="instructorCount">0</span>
-                        </div>
-                        <div class="stat-item">
-                            <span class="stat-label">Unused Codes:</span>
-                            <span class="stat-value" id="unusedCodesCount">0</span>
-                        </div>
-                    </div>
-                </div>
-            </div>
-
-            <!-- Database Sidebar -->
-            <div class="database-sidebar" id="databaseSidebar" style="display:none;">
-                <div class="database-info-box">
-                    <h4>🗄️ System Database</h4>
-                    <p>Complete system logs and activity history.</p>
-                    <div class="database-stats">
-                        <div class="stat-item">
-                            <span class="stat-label">Total Logs:</span>
-                            <span class="stat-value" id="totalLogs">0</span>
-                        </div>
-                        <div class="stat-item">
-                            <span class="stat-label">Today's Activity:</span>
-                            <span class="stat-value" id="todayActivity">0</span>
-                        </div>
-                        <div class="stat-item">
-                            <span class="stat-label">System Status:</span>
-                            <span class="stat-value" style="color:var(--available);">Online</span>
-                        </div>
-                    </div>
-                </div>
-            </div>
+            <div id="requestsSidebar" style="display:none;"></div>
+            <div id="monitoringSidebar" style="display:none;"></div>
+            <div id="usersSidebar" style="display:none;"></div>
+            <div id="databaseSidebar" style="display:none;"></div>
 
             <button class="btn-logout admin-logout" onclick="logout()">🚪 Logout</button>
         </aside>
@@ -205,45 +113,49 @@
 
             <!-- DASHBOARD VIEW (Rooms) -->
             <div class="container" id="dashboardView">
-                <header>
-                    <h2>CTU DANAO CAMPUS</h2>
-                    <p>DEPARTMENT OF TECHNOLOGY - ADMIN DASHBOARD</p>
+                <header style="display:flex;justify-content:space-between;align-items:center;">
+                    <div>
+                        <h2>CTU DANAO CAMPUS</h2>
+                        <p>DEPARTMENT OF TECHNOLOGY - ADMIN DASHBOARD</p>
+                    </div>
+                    <button class="btn-action-primary" onclick="openQuickRegisterModal()" style="width:fit-content;align-self:center;">+ Add Room</button>
                 </header>
 
-                <!-- Quick Register Modal -->
+                <!-- Add Room Modal -->
                 <div id="quickRegisterModal" class="modal" style="display:none;"
                     onclick="if(event.target===this)closeQuickRegisterModal()">
-                    <div class="modal-content" style="max-width:760px;width:100%;">
+                    <div class="modal-content" style="max-width:420px;width:100%;">
                         <div class="modal-header">
-                            <h3>Quick Register</h3>
+                            <h3>Add Room</h3>
                             <button class="btn-close" onclick="closeQuickRegisterModal()">&times;</button>
                         </div>
                         <div class="modal-body">
-                            <div class="add-room-form" style="margin-bottom:0;">
-                                <strong>Quick Register:</strong>
-                                <input type="number" id="newRoomId" placeholder="Room No." style="width:100px;">
-                                <select id="newRoomCat">
+                            <div class="form-group">
+                                <label>Room Number *</label>
+                                <input type="number" id="newRoomId" placeholder="e.g. 101" min="1" step="1" style="width:100%;" oninput="if(this.value<1||this.value==='')this.value='';else this.value=Math.floor(Math.abs(this.value))">
+                            </div>
+                            <div class="form-group">
+                                <label>Category *</label>
+                                <select id="newRoomCat" style="width:100%;">
                                     <option value="Comlab Room">Comlab Room</option>
                                     <option value="Machine Room">Machine Room</option>
                                     <option value="Library Room">Library Room</option>
                                     <option value="Office Room">Office Room</option>
                                 </select>
-                                <select id="newRoomStatus">
+                            </div>
+                            <div class="form-group">
+                                <label>Initial Status</label>
+                                <select id="newRoomStatus" style="width:100%;">
                                     <option value="Available">Available</option>
                                     <option value="Locked">Locked</option>
                                     <option value="Meeting">Meeting</option>
                                     <option value="Maintenance">Maintenance</option>
                                 </select>
-                                <div class="dropdown">
-                                    <button class="btn-add dropdown-toggle" onclick="toggleDropdown('addDropdown')">+ Register ▼</button>
-                                    <div class="dropdown-menu" id="addDropdown">
-                                        <div class="dropdown-item" onclick="addNewRoom('register')">Register Room</div>
-                                    </div>
-                                </div>
                             </div>
                         </div>
                         <div class="modal-footer">
                             <button class="btn-cancel" onclick="closeQuickRegisterModal()">Cancel</button>
+                            <button class="btn-approve" onclick="addNewRoom('register')">Add Room</button>
                         </div>
                     </div>
                 </div>
@@ -423,13 +335,14 @@
                     <table id="requestsTable" class="admin-table">
                         <thead>
                             <tr>
+                                <th>Submitted</th>
                                 <th>Instructor</th>
                                 <th>Room</th>
                                 <th>Date / Time</th>
                                 <th>Duration</th>
                                 <th>Status</th>
                                 <th>Purpose</th>
-                                <th>Actions</th>
+                                <th></th>
                             </tr>
                         </thead>
                         <tbody id="requestsBody"></tbody>
@@ -469,7 +382,13 @@
                 <div class="database-table-wrapper" style="margin-bottom:24px;padding:20px;">
                     <div style="display:flex;justify-content:space-between;align-items:center;gap:12px;margin-bottom:14px;">
                         <h3 style="margin:0;">Registration Codes</h3>
-                        <button class="btn-export" onclick="createRegistrationCode()">+ Generate Code</button>
+                        <button class="btn-action-primary" onclick="createRegistrationCode()">+ Generate Code</button>
+                    </div>
+                    <div style="display:flex;gap:6px;margin-bottom:12px;flex-wrap:wrap;">
+                        <button class="filter-btn codes-filter-btn active" data-f="unused"  onclick="setCodesFilter('unused')">Unused</button>
+                        <button class="filter-btn codes-filter-btn"        data-f="used"    onclick="setCodesFilter('used')">Used</button>
+                        <button class="filter-btn codes-filter-btn"        data-f="revoked" onclick="setCodesFilter('revoked')">Revoked</button>
+                        <button class="filter-btn codes-filter-btn"        data-f="all"     onclick="setCodesFilter('all')">All</button>
                     </div>
                     <div id="registrationCodesList"></div>
                 </div>
@@ -553,14 +472,6 @@
                     </div>
                 </div>
 
-                <div class="database-table-wrapper" style="margin-bottom:20px;padding:16px;">
-                    <div style="display:flex;justify-content:space-between;align-items:center;gap:12px;margin-bottom:12px;">
-                        <h3 style="margin:0;">Registration Codes</h3>
-                        <button class="btn-export" onclick="createRegistrationCode()">Generate Code</button>
-                    </div>
-                    <div id="registrationCodesListDb"></div>
-                </div>
-
                 <div class="database-table-wrapper">
                     <table id="databaseTable" class="admin-table">
                         <thead>
@@ -587,6 +498,18 @@
     </div><!-- end #adminView -->
 
     <!-- REJECT MODAL -->
+    <!-- REQUEST DETAIL MODAL -->
+    <div id="requestDetailModal" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,0.5);z-index:3000;align-items:center;justify-content:center;" onclick="if(event.target===this)closeRequestDetail()">
+        <div style="background:white;border-radius:14px;max-width:480px;width:90%;box-shadow:0 8px 40px rgba(0,0,0,0.2);overflow:hidden;">
+            <div style="background:var(--primary);color:white;padding:18px 22px;display:flex;justify-content:space-between;align-items:center;">
+                <h3 style="margin:0;font-size:1rem;font-weight:700;">Room Request Details</h3>
+                <button onclick="closeRequestDetail()" style="background:rgba(255,255,255,0.2);border:none;color:white;width:28px;height:28px;border-radius:50%;cursor:pointer;font-size:16px;">×</button>
+            </div>
+            <div id="requestDetailBody" style="padding:22px;"></div>
+            <div id="requestDetailFooter" style="display:flex;gap:10px;padding:16px 22px;border-top:1px solid #eee;"></div>
+        </div>
+    </div>
+
     <div id="rejectModal" class="modal" style="display:none;" onclick="if(event.target===this)closeRejectModal()">
         <div class="modal-content" style="max-width:440px;width:100%;border-radius:14px;margin:auto;">
             <div class="modal-header">
@@ -617,6 +540,7 @@
     <script src="/js/auth/login.js"></script>
 
     <!-- Admin Scripts -->
+    <script src="/js/admin/notifications.js"></script>
     <script src="/js/admin/dashboard.js"></script>
     <script src="/js/admin/monitoring.js"></script>
     <script src="/js/admin/requests.js"></script>

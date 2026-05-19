@@ -100,7 +100,8 @@ function applyServerData(data) {
         }
     }
 
-    // Notify instructor of request status changes
+    // Instructor red-dot notifications on status changes
+    // (badge logic lives in renderMyRequests / renderMySchedules which run after this)
     if (typeof showNotification === 'function' && prevRequests.length > 0) {
         const session = typeof getSession === 'function' ? getSession() : null;
         if (session?.role === 'instructor') {
@@ -151,7 +152,7 @@ function initSync() {
         refreshData({ render: true }).catch((error) => {
             console.warn('Polling sync failed:', error.message);
         });
-    }, 15000);
+    }, 5000);
 }
 
 function stopSync() {
@@ -169,6 +170,7 @@ function refreshUI() {
     if (typeof updateScheduleNotifications === 'function') updateScheduleNotifications();
     if (typeof renderRegistrationCodes === 'function') renderRegistrationCodes();
     if (typeof checkAndAutoApproveQueue === 'function') checkAndAutoApproveQueue();
+    if (typeof updateRequestsSidebar === 'function') updateRequestsSidebar();
 
     if (typeof renderInstructorAvailableRooms === 'function') renderInstructorAvailableRooms();
     if (typeof renderMySchedules === 'function') renderMySchedules();

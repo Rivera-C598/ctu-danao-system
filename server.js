@@ -600,6 +600,15 @@ app.post('/api/registration-codes', requireAuth, requireRole('admin'), async (re
     }
 });
 
+app.delete('/api/registration-codes/:id/permanent', requireAuth, requireRole('admin'), async (req, res, next) => {
+    try {
+        await requireDb().query('DELETE FROM registration_codes WHERE id = $1 AND revoked_at IS NOT NULL', [req.params.id]);
+        res.json({ ok: true });
+    } catch (error) {
+        next(error);
+    }
+});
+
 app.delete('/api/registration-codes/:id', requireAuth, requireRole('admin'), async (req, res, next) => {
     try {
         await requireDb().query('UPDATE registration_codes SET revoked_at = now() WHERE id = $1 AND used_at IS NULL', [req.params.id]);
@@ -697,6 +706,19 @@ app.post('/api/requests', requireAuth, requireRole('instructor'), async (req, re
             return res.status(409).json({ error: `You already have a request for this room on ${date} at ${dupRows[0].start_time?.slice(0,5)}–${dupRows[0].end_time?.slice(0,5)}.` });
         }
 
+        // Block if another instructor already has an overlapping pending/approved request
+        const { rows: otherRows } = await client.query(`
+            SELECT id, start_time, end_time FROM room_requests
+            WHERE instructor_id != $1 AND room_id = $2 AND date = $3
+              AND status IN ('pending','active','standby')
+              AND start_time < $5 AND end_time > $4
+            LIMIT 1
+        `, [req.user.id, room.id, date, startTime, endTime]);
+        if (otherRows[0]) {
+            await client.query('ROLLBACK');
+            return res.status(409).json({ error: `This time slot is already taken or pending for this room (${otherRows[0].start_time?.slice(0,5)}–${otherRows[0].end_time?.slice(0,5)}). Choose a different time.` });
+        }
+
         const requestedStatus = req.body.requestedStatus || 'locked';
         const { rows } = await client.query(`
             INSERT INTO room_requests (room_id, instructor_id, date, start_time, end_time, purpose, requested_status, status)
@@ -728,9 +750,21 @@ app.post('/api/requests/:id/approve', requireAuth, requireRole('admin'), async (
         const request = reqRows[0];
         if (!request) { await client.query('ROLLBACK'); return res.status(404).json({ error: 'Pending request not found.' }); }
 
-        const overlaps = await hasOverlap(client, request.room_id, request.date, request.start_time, request.end_time);
-        const status = overlaps ? 'standby' : 'active';
-        const queuePosition = overlaps ? await nextQueuePosition(client, request.room_id, request.date) : null;
+        // True overlap = times actually intersect (conflict) → reject, admin must manually reject
+        const trueOverlap = await hasOverlap(client, request.room_id, request.date, request.start_time, request.end_time);
+        if (trueOverlap) {
+            await client.query('ROLLBACK');
+            return res.status(409).json({ error: 'Time conflict: this slot overlaps with an existing approved booking. Please reject this request.' });
+        }
+
+        // Sequential (no overlap) — queue if any other schedule exists for this room+date
+        const { rows: existingScheds } = await client.query(
+            `SELECT id FROM room_schedules WHERE room_id=$1 AND date=$2 AND status IN ('active','standby') LIMIT 1`,
+            [request.room_id, request.date]
+        );
+        const hasOtherSchedule = existingScheds.length > 0;
+        const status = hasOtherSchedule ? 'standby' : 'active';
+        const queuePosition = hasOtherSchedule ? await nextQueuePosition(client, request.room_id, request.date) : null;
 
         await client.query(`
             UPDATE room_requests SET status = $1, queue_position = $2, decided_at = now(), decided_by = $3 WHERE id = $4

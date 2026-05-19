@@ -228,36 +228,32 @@
                 </div>
 
                 <div class="form-group">
-                    <label>Requested Status</label>
+                    <label>Usage Type</label>
                     <div class="request-type-options">
                         <label class="radio-label">
                             <input type="radio" name="requestStatus" value="locked" checked>
-                            <span class="radio-text">🔒 Locked</span>
+                            <span class="radio-text">🔒 Class / Private Use</span>
                         </label>
                         <label class="radio-label">
                             <input type="radio" name="requestStatus" value="meeting">
-                            <span class="radio-text">👥 Meeting</span>
-                        </label>
-                        <label class="radio-label">
-                            <input type="radio" name="requestStatus" value="maintenance">
-                            <span class="radio-text">🔧 Maintenance</span>
+                            <span class="radio-text">👥 Group Meeting</span>
                         </label>
                     </div>
                 </div>
 
                 <div class="form-group">
                     <label>Date</label>
-                    <input type="date" id="requestDate" min="">
+                    <input type="date" id="requestDate" min="" onchange="checkMyExistingBooking()">
                 </div>
 
                 <div class="form-row">
                     <div class="form-group">
                         <label>Start Time</label>
-                        <input type="time" id="requestStartTime">
+                        <input type="time" id="requestStartTime" onchange="autoFillEndTime();checkMyExistingBooking();" step="900">
                     </div>
                     <div class="form-group">
                         <label>End Time</label>
-                        <input type="time" id="requestEndTime">
+                        <input type="time" id="requestEndTime" onchange="checkMyExistingBooking();" step="900">
                     </div>
                 </div>
 
@@ -266,6 +262,7 @@
                     <textarea id="requestPurpose" rows="3" placeholder="Describe the purpose of this room request..."></textarea>
                 </div>
 
+                <div id="myBookingWarning" style="display:none;background:rgba(243,156,18,0.12);border:1px solid rgba(243,156,18,0.3);border-radius:8px;padding:10px 12px;font-size:12px;color:#d4680a;margin-bottom:8px;"></div>
                 <div class="conflict-warning" id="conflictWarning" style="display:none;">
                     <span>⚠️</span> This time slot conflicts with an existing schedule.
                 </div>

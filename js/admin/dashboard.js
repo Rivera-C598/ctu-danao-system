@@ -175,7 +175,7 @@ function renderTable() {
             <td><strong style="font-size:1.1rem;color:var(--primary);">${room.id}</strong></td>
             <td>
                 <span style="font-weight:600;">${room.category}</span>
-                ${isRestricted ? '<br><small style="color:#e74c3c;font-weight:600;">Requests restricted</small>' : ''}
+                ${isRestricted ? '<br><span style="display:inline-block;margin-top:4px;background:#fce4ec;color:#c0392b;border-radius:4px;padding:2px 8px;font-size:11px;font-weight:700;">🚫 Requests Blocked</span>' : ''}
             </td>
             <td>
                 <select class="status-selector ${statusClass}" onchange="changeStatus(${index}, this.value)">
@@ -192,8 +192,8 @@ function renderTable() {
             </td>
             <td>
                 <div style="display:flex;gap:6px;flex-wrap:wrap;align-items:center;">
-                    <button class="btn-outline-action" onclick="toggleRoomRequestable(${room.id}, ${isRestricted ? 'true' : 'false'})">
-                        ${isRestricted ? 'Allow Requests' : 'Restrict'}
+                    <button class="${isRestricted ? 'btn-outline-action' : 'btn-danger-outline'}" onclick="toggleRoomRequestable(${room.id}, ${isRestricted ? 'true' : 'false'})">
+                        ${isRestricted ? '✓ Allow Requests' : '🚫 Block Requests'}
                     </button>
                     <button class="btn-danger-outline" onclick="removeRoom(${index})">Remove</button>
                 </div>
@@ -967,83 +967,129 @@ function completeFinalSession(index) {
     completeCurrentSession(index);
 }
 
+let _codesFilter = 'unused';
+
 async function createRegistrationCode() {
+    if (!await showConfirm('Generate a new registration code?', { confirmText: 'Generate', confirmStyle: 'background:#27ae60;color:white;' })) return;
     try {
-        const result = await apiFetch('/api/registration-codes', {
-            method: 'POST',
-            body: '{}'
-        });
+        const result = await apiFetch('/api/registration-codes', { method: 'POST', body: '{}' });
         await refreshData({ render: true });
-        showNotification('Code Generated', `${result.code} — share this with the instructor`, 'success', 6000);
+        // Show result with copy button
+        const overlay = document.createElement('div');
+        overlay.style.cssText = 'position:fixed;inset:0;background:rgba(0,0,0,0.5);z-index:9999;display:flex;align-items:center;justify-content:center;padding:16px;';
+        overlay.innerHTML = `
+            <div style="background:white;border-radius:14px;padding:28px;max-width:360px;width:100%;text-align:center;box-shadow:0 8px 40px rgba(0,0,0,0.25);">
+                <div style="font-size:2rem;margin-bottom:12px;">🎉</div>
+                <div style="font-weight:700;font-size:1rem;margin-bottom:6px;">Code Generated!</div>
+                <div style="font-size:0.85rem;color:#666;margin-bottom:16px;">Share this one-time code with the instructor.</div>
+                <div style="background:#f5f5f5;border-radius:8px;padding:14px;font-family:monospace;font-size:1.2rem;font-weight:700;color:var(--primary,#c0392b);letter-spacing:0.05em;margin-bottom:16px;">${result.code}</div>
+                <div style="display:flex;gap:10px;">
+                    <button onclick="navigator.clipboard.writeText('${result.code}').then(()=>this.textContent='✓ Copied!')" style="flex:1;padding:10px;border:1.5px solid #ddd;background:white;border-radius:8px;cursor:pointer;font-weight:600;">📋 Copy</button>
+                    <button onclick="this.closest('div[style*=fixed]').remove()" style="flex:1;padding:10px;border:none;background:var(--primary,#c0392b);color:white;border-radius:8px;cursor:pointer;font-weight:700;">Done</button>
+                </div>
+            </div>`;
+        document.body.appendChild(overlay);
     } catch (error) {
         showToast(error.message, 'error');
     }
 }
 
 async function revokeRegistrationCode(id) {
-    if (!await showConfirm('Revoke this registration code?')) return;
+    if (!await showConfirm('Revoke this code? The instructor will no longer be able to use it.', {
+        confirmText: 'Revoke', confirmStyle: 'background:#e74c3c;color:white;', title: 'Revoke Code'
+    })) return;
     try {
         await apiFetch(`/api/registration-codes/${id}`, { method: 'DELETE' });
         await refreshData({ render: true });
+        showToast('Code revoked.', 'info');
     } catch (error) {
         showToast(error.message, 'error');
     }
 }
 
+async function deleteRevokedCode(id) {
+    if (!await showConfirm('Permanently delete this revoked code? This cannot be undone.', {
+        confirmText: 'Delete', confirmStyle: 'background:#e74c3c;color:white;'
+    })) return;
+    try {
+        await apiFetch(`/api/registration-codes/${id}/permanent`, { method: 'DELETE' });
+        await refreshData({ render: true });
+        showToast('Code permanently deleted.', 'success');
+    } catch (error) {
+        showToast(error.message, 'error');
+    }
+}
+
+function setCodesFilter(f) {
+    _codesFilter = f;
+    document.querySelectorAll('.codes-filter-btn').forEach(b => b.classList.toggle('active', b.dataset.f === f));
+    renderRegistrationCodes(1);
+}
+
 let codesPage = 1;
-const CODES_PER_PAGE = 5;
+const CODES_PER_PAGE = 8;
 
 function renderRegistrationCodes(page) {
     if (page) codesPage = page;
     const container = document.getElementById('registrationCodesList');
     if (!container) return;
-    if (registrationCodes.length === 0) {
-        container.innerHTML = '<p style="color:#999; font-size:0.9rem;">No codes yet. Generate one above.</p>';
+
+    const all = registrationCodes || [];
+    const filtered = all.filter(c => {
+        if (_codesFilter === 'unused')  return !c.usedAt && !c.revokedAt;
+        if (_codesFilter === 'used')    return !!c.usedAt;
+        if (_codesFilter === 'revoked') return !!c.revokedAt;
+        return true;
+    });
+
+    if (all.length === 0) {
+        container.innerHTML = '<p style="color:#999;font-size:0.9rem;">No codes yet.</p>';
         return;
     }
 
-    const totalPages = Math.ceil(registrationCodes.length / CODES_PER_PAGE);
-    const start = (codesPage - 1) * CODES_PER_PAGE;
-    const pageCodes = registrationCodes.slice(start, start + CODES_PER_PAGE);
+    const totalPages = Math.ceil(filtered.length / CODES_PER_PAGE);
+    const pageCodes  = filtered.slice((codesPage - 1) * CODES_PER_PAGE, codesPage * CODES_PER_PAGE);
 
-    const rows = pageCodes.map(code => {
-        const isUsed = !!code.usedAt;
-        const isRevoked = !!code.revokedAt;
-        const badge = isUsed
-            ? `<span class="badge-used">✓ Used by ${code.usedBy || 'unknown'}</span>`
-            : isRevoked
-            ? `<span class="badge-revoked">✕ Revoked</span>`
-            : `<span class="badge-unused">● Unused</span>`;
-        const revokeBtn = !isUsed && !isRevoked
-            ? `<button class="btn-danger-outline" style="padding:4px 10px;font-size:0.78rem;" onclick="revokeRegistrationCode('${code.id}')">Revoke</button>`
-            : '';
-        const meta = isUsed
-            ? `Used ${new Date(code.usedAt).toLocaleDateString()}`
-            : isRevoked
-            ? `Revoked ${new Date(code.revokedAt).toLocaleDateString()}`
-            : 'Ready to share';
-        return `
-            <div class="reg-code-item">
-                <div>
-                    <div class="reg-code-text">${code.code}</div>
-                    <div class="reg-code-meta">${meta}</div>
-                </div>
-                <div style="display:flex;align-items:center;gap:10px;">
-                    ${badge}
-                    ${revokeBtn}
-                </div>
-            </div>`;
-    }).join('');
+    const rows = pageCodes.length === 0
+        ? '<p style="color:#999;font-size:0.85rem;padding:8px 0;">No codes in this category.</p>'
+        : pageCodes.map(code => {
+            const isUsed    = !!code.usedAt;
+            const isRevoked = !!code.revokedAt;
+            const badge = isUsed
+                ? `<span class="badge-used">✓ Used by ${code.usedBy || 'unknown'}</span>`
+                : isRevoked
+                ? `<span class="badge-revoked">✕ Revoked</span>`
+                : `<span class="badge-unused">● Unused</span>`;
+            const meta = isUsed
+                ? `Used ${new Date(code.usedAt).toLocaleDateString()}`
+                : isRevoked
+                ? `Revoked ${new Date(code.revokedAt).toLocaleDateString()}`
+                : 'Ready to share';
+            const actions = isRevoked
+                ? `<button class="btn-danger-outline" style="padding:4px 10px;font-size:0.78rem;" onclick="deleteRevokedCode('${code.id}')">Delete</button>`
+                : !isUsed
+                ? `<button onclick="navigator.clipboard.writeText('${code.code}').then(()=>this.textContent='✓')" style="padding:4px 8px;font-size:0.78rem;border:1.5px solid #ddd;background:white;border-radius:6px;cursor:pointer;" title="Copy code">📋</button>
+                   <button class="btn-danger-outline" style="padding:4px 10px;font-size:0.78rem;" onclick="revokeRegistrationCode('${code.id}')">Revoke</button>`
+                : '';
+            return `
+                <div class="reg-code-item">
+                    <div>
+                        <div class="reg-code-text">${code.code}</div>
+                        <div class="reg-code-meta">${meta}</div>
+                    </div>
+                    <div style="display:flex;align-items:center;gap:8px;">${badge}${actions}</div>
+                </div>`;
+        }).join('');
 
     const pagination = totalPages > 1 ? `
-        <div style="display:flex;align-items:center;justify-content:space-between;margin-top:12px;font-size:0.85rem;color:#666;">
-            <span>${registrationCodes.length} codes total</span>
-            <div style="display:flex;gap:6px;align-items:center;">
-                <button class="btn-outline-action" style="padding:4px 10px;" ${codesPage === 1 ? 'disabled style="opacity:0.4;cursor:not-allowed;"' : ''} onclick="renderRegistrationCodes(${codesPage - 1})">‹ Prev</button>
-                <span>Page ${codesPage} of ${totalPages}</span>
-                <button class="btn-outline-action" style="padding:4px 10px;" ${codesPage === totalPages ? 'disabled style="opacity:0.4;cursor:not-allowed;"' : ''} onclick="renderRegistrationCodes(${codesPage + 1})">Next ›</button>
+        <div class="table-pagination" style="margin-top:10px;">
+            <span>${filtered.length} code${filtered.length !== 1 ? 's' : ''}</span>
+            <div class="pagination-controls">
+                <button class="pagination-btn" ${codesPage === 1 ? 'disabled' : ''} onclick="renderRegistrationCodes(${codesPage - 1})">‹</button>
+                <span>${codesPage} / ${totalPages}</span>
+                <button class="pagination-btn" ${codesPage === totalPages ? 'disabled' : ''} onclick="renderRegistrationCodes(${codesPage + 1})">›</button>
             </div>
-        </div>` : '';
+        </div>` : `<div style="font-size:0.78rem;color:#999;margin-top:6px;">${filtered.length} code${filtered.length !== 1 ? 's' : ''}</div>`;
 
     container.innerHTML = rows + pagination;
 }

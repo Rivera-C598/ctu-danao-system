@@ -4,6 +4,51 @@
 
 let _activeRequestFilter = 'pending';
 
+function openRequestDetail(requestId) {
+    const req = roomRequests.find(r => r.id === requestId);
+    if (!req) return;
+    const modal = document.getElementById('requestDetailModal');
+    const body  = document.getElementById('requestDetailBody');
+    const footer = document.getElementById('requestDetailFooter');
+    if (!modal || !body || !footer) return;
+
+    const usageLabel = { locked: '🔒 Class / Private Use', meeting: '👥 Group Meeting', maintenance: '🔧 Maintenance' }[req.requestedStatus] || req.requestedStatus;
+    const isPending = req.status === 'pending';
+
+    body.innerHTML = `
+        <div style="display:grid;gap:12px;">
+            <div style="display:flex;justify-content:space-between;align-items:start;">
+                <div>
+                    <div style="font-size:1.3rem;font-weight:800;color:var(--primary);">Room ${req.roomId}</div>
+                    <div style="font-size:0.85rem;color:#888;">${req.roomCategory || ''}</div>
+                </div>
+                <span style="background:${isPending ? '#f39c12' : '#27ae60'};color:white;padding:4px 12px;border-radius:12px;font-size:0.78rem;font-weight:700;">${isPending ? '🕐 Pending' : '✓ ' + req.status}</span>
+            </div>
+            <hr style="border:none;border-top:1px solid #f0f0f0;margin:0;">
+            <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;font-size:0.88rem;">
+                <div><div style="color:#888;font-size:0.78rem;margin-bottom:2px;">INSTRUCTOR</div><div style="font-weight:600;">${req.instructorName || getInstructorFullName(req.instructor)}</div></div>
+                <div><div style="color:#888;font-size:0.78rem;margin-bottom:2px;">DATE</div><div style="font-weight:600;">${req.date}</div></div>
+                <div><div style="color:#888;font-size:0.78rem;margin-bottom:2px;">TIME</div><div style="font-weight:600;">${typeof fmt12Range === 'function' ? fmt12Range(req.startTime, req.endTime) : req.startTime + ' – ' + req.endTime}</div></div>
+                <div><div style="color:#888;font-size:0.78rem;margin-bottom:2px;">DURATION</div><div style="font-weight:600;">${typeof calculateDuration === 'function' ? calculateDuration(req.startTime, req.endTime) : '—'}</div></div>
+                <div><div style="color:#888;font-size:0.78rem;margin-bottom:2px;">USAGE TYPE</div><div style="font-weight:600;">${usageLabel}</div></div>
+                <div><div style="color:#888;font-size:0.78rem;margin-bottom:2px;">SUBMITTED</div><div style="font-weight:600;">${req.requestedAt ? new Date(req.requestedAt).toLocaleString() : '—'}</div></div>
+            </div>
+            ${req.purpose ? `<div style="background:#f8f8f8;border-radius:8px;padding:12px;font-size:0.85rem;"><div style="color:#888;font-size:0.75rem;margin-bottom:4px;">PURPOSE / ACTIVITY</div><div>${req.purpose}</div></div>` : ''}
+        </div>`;
+
+    footer.innerHTML = isPending ? `
+        <button onclick="approveRequest('${req.id}')" style="flex:1;padding:11px;border:none;background:#27ae60;color:white;border-radius:8px;cursor:pointer;font-weight:700;font-family:inherit;">✓ Approve</button>
+        <button onclick="closeRequestDetail();rejectRequest('${req.id}')"  style="flex:1;padding:11px;border:none;background:#e74c3c;color:white;border-radius:8px;cursor:pointer;font-weight:700;font-family:inherit;">✕ Reject</button>
+    ` : `<button onclick="closeRequestDetail()" style="flex:1;padding:11px;border:1.5px solid #ddd;background:white;border-radius:8px;cursor:pointer;font-weight:600;font-family:inherit;">Close</button>`;
+
+    modal.style.display = 'flex';
+}
+
+function closeRequestDetail() {
+    const m = document.getElementById('requestDetailModal');
+    if (m) m.style.display = 'none';
+}
+
 function _syncFilterButtons() {
     document.querySelectorAll('.filter-btn').forEach(btn => {
         const onclick = btn.getAttribute('onclick') || '';
@@ -84,33 +129,29 @@ function renderRequestsTable(filter) {
         const actions = isPending ? `
             <button class="btn-approve" onclick="approveRequest('${req.id}')">✓ Approve</button>
             <button class="btn-reject"  onclick="rejectRequest('${req.id}')">✕ Reject</button>
-        ` : isApproved ? `
-            <button class="btn-reject" onclick="rejectRequest('${req.id}')">Cancel</button>
-        ` : `<span style="color:#999;font-size:0.82rem;">Closed</span>`;
+        ` : `<span style="color:#999;font-size:0.82rem;">—</span>`;
 
         const duration = (req.startTime && req.endTime) ? calculateDuration(req.startTime, req.endTime) : '—';
+        const clickable = isPending ? `onclick="openRequestDetail('${req.id}')" style="cursor:pointer;" title="Click to review"` : '';
+        const submittedAt = req.requestedAt
+            ? new Date(req.requestedAt).toLocaleString('en-PH', { month:'short', day:'numeric', hour:'2-digit', minute:'2-digit', hour12:true })
+            : '—';
         return `
-        <tr>
+        <tr ${clickable} class="${isPending ? 'request-row-pending' : ''}">
+            <td style="font-size:0.8rem;color:#888;white-space:nowrap;">${submittedAt}</td>
             <td>${escapeHtml(req.instructorName || getInstructorFullName(req.instructor))}</td>
             <td><strong>Room ${escapeHtml(req.roomId)}</strong><br><small style="color:#888;">${escapeHtml(req.roomCategory)}</small></td>
             <td>
                 <div style="font-weight:600;">${escapeHtml(req.date)}</div>
-                <div style="font-size:0.85rem;color:#666;">${escapeHtml(req.startTime)} – ${escapeHtml(req.endTime)}</div>
+                <div style="font-size:0.85rem;color:#666;">${fmt12Range(req.startTime, req.endTime)}</div>
             </td>
             <td><span class="duration-badge">${escapeHtml(duration)}</span></td>
             <td>
                 <span style="background:${statusColor};color:white;padding:3px 10px;border-radius:12px;font-size:0.78rem;font-weight:700;">${escapeHtml(statusLabel)}</span>
                 ${req.queuePosition ? `<div style="font-size:0.78rem;color:#888;margin-top:4px;">Queue #${escapeHtml(String(req.queuePosition))}</div>` : ''}
             </td>
-            <td style="font-size:0.85rem;">
-                <div><strong>${escapeHtml(req.requestedStatus || 'locked')}</strong></div>
-                <div style="color:#666;">${escapeHtml(req.purpose || '—')}</div>
-            </td>
-            <td>
-                <div style="display:flex;gap:6px;flex-wrap:wrap;">
-                    ${actions}
-                </div>
-            </td>
+            <td style="font-size:0.85rem;">${escapeHtml(req.purpose || '—')}</td>
+            ${isPending ? `<td style="color:#c0392b;font-size:0.78rem;font-weight:600;">Click to review →</td>` : '<td></td>'}
         </tr>`;
     }).join('');
 
@@ -128,15 +169,20 @@ function filterRequests(filter) {
 async function approveRequest(requestId) {
     const req = roomRequests.find(r => r.id === requestId);
     if (!req) return;
-    if (!await showConfirm(`Approve Room ${req.roomId} for ${req.instructorName || req.instructor}?\n${req.date}  ${req.startTime}–${req.endTime}`)) return;
+    if (!await showConfirm(`Approve Room ${req.roomId} for ${req.instructorName || req.instructor}?\n${req.date}  ${fmt12Range(req.startTime, req.endTime)}`)) return;
+    closeRequestDetail();
     try {
         const result = await apiFetch(`/api/requests/${requestId}/approve`, { method: 'POST', body: '{}' });
-        await refreshData({ render: true });
+        await refreshData({ render: true, force: true });
         showNotification('Approved', result.status === 'standby'
-            ? 'Added to queue — time slot already has an active booking.'
+            ? 'Added to queue — sequential slot.'
             : 'Room booked for this slot.', 'success', 4000);
     } catch (error) {
-        showNotification('Error', error.message, 'error', 4000);
+        const msg = error.message || 'Failed to approve request.';
+        if (typeof showNotification === 'function') showNotification('⚠ Conflict', msg, 'error', 8000);
+        else if (typeof showToast === 'function') showToast(msg, 'error');
+        else await showConfirm(msg, { title: '⚠ Cannot Approve', confirmText: 'OK', cancelText: '' });
+        await refreshData({ render: true });
     }
 }
 

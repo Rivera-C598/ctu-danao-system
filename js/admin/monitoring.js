@@ -108,47 +108,68 @@ function renderMonitoringTable() {
     const schedPageSize = typeof PAGE_SIZE !== 'undefined' ? PAGE_SIZE : 10;
     allRows = allRows.slice((schedPage - 1) * schedPageSize, schedPage * schedPageSize);
 
-    tbody.innerHTML = allRows.map((row) => {
-        const duration = calculateDuration(row.schedule.startTime, row.schedule.endTime);
-        const isActive  = row.schedule.queueStatus === 'active';
-        const isStandby = row.schedule.queueStatus === 'standby';
-        const today = new Date().toISOString().split('T')[0];
-        const isToday  = row.schedule.date === today;
-        const isPast   = row.schedule.date < today;
+    const nowMinutesNow = new Date().getHours() * 60 + new Date().getMinutes();
 
-        const queueBadge = isActive
-            ? '<span style="background:#27ae60;color:white;padding:3px 10px;border-radius:12px;font-size:0.78rem;font-weight:700;">✓ Active</span>'
+    tbody.innerHTML = allRows.map((row) => {
+        const s = row.schedule;
+        const duration  = calculateDuration(s.startTime, s.endTime);
+        const isActive  = s.queueStatus === 'active';
+        const isStandby = s.queueStatus === 'standby';
+        const todayStr  = new Date().toISOString().split('T')[0];
+        const isToday   = s.date === todayStr;
+        const isPast    = s.date < todayStr;
+
+        // Is this schedule currently happening right now?
+        const [sh, sm] = (s.startTime || '00:00').split(':').map(Number);
+        const [eh, em] = (s.endTime   || '23:59').split(':').map(Number);
+        const startMins = sh * 60 + sm;
+        const endMins   = eh * 60 + em;
+        const isNow     = isToday && isActive && nowMinutesNow >= startMins && nowMinutesNow < endMins;
+
+        // Time remaining for active-now schedules
+        const minsLeft  = endMins - nowMinutesNow;
+        const timerHtml = isNow
+            ? `<span style="display:inline-block;margin-left:6px;background:#e8f5e9;color:#1a9e5c;border-radius:6px;padding:2px 8px;font-size:0.75rem;font-weight:700;">⏱ ${minsLeft}m left</span>`
+            : '';
+
+        const queueBadge = isNow
+            ? `<span style="background:#27ae60;color:white;padding:3px 10px;border-radius:12px;font-size:0.78rem;font-weight:700;">🟢 Active Now</span>`
+            : isActive
+            ? `<span style="background:#3498db;color:white;padding:3px 10px;border-radius:12px;font-size:0.78rem;font-weight:700;">✓ Approved</span>`
             : isStandby
             ? `<span style="background:#f39c12;color:white;padding:3px 10px;border-radius:12px;font-size:0.78rem;font-weight:700;">⏳ Queue #${row.queuePosition}</span>`
             : '';
 
-        const dateLabel = isPast ? `<span style="color:#e74c3c;">${row.schedule.date} (past)</span>`
-            : isToday ? `<span style="color:#27ae60;font-weight:600;">Today</span>`
-            : `<span>${row.schedule.date}</span>`;
+        const dateLabel = isPast   ? `<span style="color:#e74c3c;font-size:0.8rem;">${s.date}</span>`
+            : isToday ? `<span style="color:#27ae60;font-weight:600;font-size:0.8rem;">Today</span>`
+            : `<span style="font-size:0.8rem;">${s.date}</span>`;
 
         const roomIndex = allRooms.findIndex(r => r.id === row.room.id);
-
         const actions = `
             <div style="display:flex;gap:6px;flex-wrap:wrap;">
                 ${isActive && isToday ? `<button class="btn-complete" onclick="openCompleteSessionModal(${roomIndex})">✓ Done</button>` : ''}
-                <button class="btn-danger-outline" onclick="removeFutureSchedule(${row.room.id}, '${row.schedule.date}', '${row.schedule.startTime}', '${row.schedule.endTime}', '${row.schedule.instructor}')">Remove</button>
+                <button class="btn-danger-outline" style="font-size:0.78rem;padding:5px 10px;" onclick="removeFutureSchedule(${row.room.id}, '${s.date}', '${s.startTime}', '${s.endTime}', '${s.instructor}')">Remove</button>
             </div>`;
 
+        const rowStyle = isNow
+            ? 'background:linear-gradient(90deg,rgba(39,174,96,0.06),transparent);border-left:3px solid #27ae60;'
+            : '';
+
         return `
-        <tr data-date="${row.schedule.date}" data-status="${row.room.status}" data-instructor="${(row.schedule.instructor || '').toLowerCase()}" data-category="${row.room.category.toLowerCase()}" data-room="${row.room.id}">
+        <tr style="${rowStyle}" data-date="${s.date}" data-status="${row.room.status}" data-instructor="${(s.instructor||'').toLowerCase()}" data-category="${row.room.category.toLowerCase()}" data-room="${row.room.id}">
             <td>
-                <strong style="color:var(--primary);">Room ${row.room.id}</strong>
-                <div style="font-size:0.8rem;color:#888;">${row.room.category}</div>
+                <strong style="color:var(--primary);font-size:1rem;">Room ${row.room.id}</strong>
+                <div style="font-size:0.78rem;color:#888;">${row.room.category}</div>
             </td>
             <td>
-                <span style="font-weight:600;">${getInstructorFullName(row.schedule.instructor)}</span>
-                ${row.totalInQueue > 1 ? `<div style="font-size:0.78rem;color:#888;">${row.totalInQueue} in queue</div>` : ''}
+                <span style="font-weight:${isNow ? '700' : '600'};">${getInstructorFullName(s.instructor)}</span>
+                ${row.totalInQueue > 1 ? `<div style="font-size:0.75rem;color:#888;">${row.totalInQueue} in queue</div>` : ''}
             </td>
             <td>
                 ${dateLabel}
-                <div style="font-size:0.85rem;color:#555;">${row.schedule.startTime || '--:--'} – ${row.schedule.endTime || '--:--'}</div>
+                <div style="font-size:0.85rem;color:#555;font-weight:${isNow ? '700' : '400'};">${fmt12Range(s.startTime, s.endTime)}${timerHtml}</div>
             </td>
-            <td><span class="duration-badge">${duration}</span></td>
+            <td><span class="duration-badge" style="font-weight:${isNow ? '700' : '400'};">${duration}</span></td>
             <td>${queueBadge}</td>
             <td>${actions}</td>
         </tr>`;

@@ -2,6 +2,19 @@
    CTU Room Management System - Helpers Module
    ============================================ */
 
+function fmt12(timeStr) {
+    if (!timeStr) return '—';
+    const [h, m] = timeStr.split(':').map(Number);
+    if (isNaN(h)) return timeStr;
+    const ampm = h >= 12 ? 'PM' : 'AM';
+    const h12  = h % 12 || 12;
+    return `${h12}:${String(m).padStart(2,'0')} ${ampm}`;
+}
+
+function fmt12Range(start, end) {
+    return `${fmt12(start)} – ${fmt12(end)}`;
+}
+
 function escapeHtml(str) {
     if (str == null) return '';
     return String(str)

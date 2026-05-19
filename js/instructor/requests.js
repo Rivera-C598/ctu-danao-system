@@ -35,7 +35,107 @@ function openRequestModal(roomId) {
     document.getElementById('requestEndTime').value = '';
     document.getElementById('requestPurpose').value = '';
     document.getElementById('conflictWarning').style.display = 'none';
+    const prevErr = document.getElementById('submitErrorMsg');
+    if (prevErr) prevErr.style.display = 'none';
     document.getElementById('requestModal').classList.remove('modal-hidden');
+    autoFillEndTime();
+    checkMyExistingBooking();
+}
+
+function checkMyExistingBooking() {
+    const date = document.getElementById('requestDate')?.value;
+    const startTime = document.getElementById('requestStartTime')?.value;
+    const endTime   = document.getElementById('requestEndTime')?.value;
+    const warn = document.getElementById('myBookingWarning');
+    if (!warn || !date || !selectedRoomForRequest) return;
+    const session = getSession();
+    if (!session) return;
+    const myUser = (session.username || '').toLowerCase().trim();
+    const today  = new Date().toISOString().split('T')[0];
+    const nowM   = new Date().getHours() * 60 + new Date().getMinutes();
+
+    const existing = (roomRequests || []).filter(r =>
+        (r.instructor || '').toLowerCase().trim() === myUser &&
+        r.roomId === selectedRoomForRequest &&
+        r.date === date &&
+        ['pending','active','standby'].includes(r.status)
+    );
+    // Also check OTHER instructors' approved bookings for this room/date
+    if (startTime && endTime) {
+        const [ns, nm] = startTime.split(':').map(Number);
+        const [ne, nem] = endTime.split(':').map(Number);
+        const reqStart = ns * 60 + nm, reqEnd = ne * 60 + nem;
+        const otherConflict = (roomRequests || []).find(r =>
+            (r.instructor || '').toLowerCase().trim() !== myUser &&
+            r.roomId === selectedRoomForRequest &&
+            r.date === date &&
+            ['pending','active','standby'].includes(r.status) &&
+            (() => {
+                const [es, em] = (r.startTime||'').split(':').map(Number);
+                const [ee, eem] = (r.endTime||'').split(':').map(Number);
+                return reqStart < (ee*60+eem) && reqEnd > (es*60+em);
+            })()
+        );
+        if (otherConflict) {
+            warn.innerHTML = `🚫 <strong>Time slot unavailable.</strong> This room is already booked from <strong>${fmt12Range(otherConflict.startTime, otherConflict.endTime)}</strong>. Please choose a non-overlapping time.`;
+            warn.style.background = 'rgba(231,76,60,0.1)';
+            warn.style.borderColor = 'rgba(231,76,60,0.3)';
+            warn.style.color = '#c0392b';
+            warn.style.display = 'block';
+            return;
+        }
+    }
+
+    if (existing.length === 0) { warn.style.display = 'none'; return; }
+
+    // Check if any existing booking overlaps with requested times
+    let overlapMsg = '';
+    if (startTime && endTime) {
+        const [ns, nm] = startTime.split(':').map(Number);
+        const [ne, nem] = endTime.split(':').map(Number);
+        const reqStart = ns * 60 + nm, reqEnd = ne * 60 + nem;
+
+        const overlap = existing.find(r => {
+            const [es, em] = (r.startTime || '').split(':').map(Number);
+            const [ee, eem] = (r.endTime || '').split(':').map(Number);
+            const rStart = es * 60 + em, rEnd = ee * 60 + eem;
+            return reqStart < rEnd && reqEnd > rStart;
+        });
+
+        if (overlap) {
+            const isActiveNow = overlap.status === 'active' && date === today &&
+                nowM >= (overlap.startTime.split(':')[0]*60 + +overlap.startTime.split(':')[1]) &&
+                nowM <  (overlap.endTime.split(':')[0]*60   + +overlap.endTime.split(':')[1]);
+            overlapMsg = isActiveNow
+                ? `🚫 <strong>You are currently using this room</strong> (${fmt12Range(overlap.startTime, overlap.endTime)}). You cannot request the same room while your session is active. Try a different room or a time after your session ends.`
+                : `🚫 <strong>Time conflict</strong> with your existing booking (${fmt12Range(overlap.startTime, overlap.endTime)}). Choose a non-overlapping time slot.`;
+        }
+    }
+
+    if (overlapMsg) {
+        warn.innerHTML = overlapMsg;
+        warn.style.background = 'rgba(231,76,60,0.1)';
+        warn.style.borderColor = 'rgba(231,76,60,0.3)';
+        warn.style.color = '#c0392b';
+    } else {
+        const slots = existing.map(r => fmt12Range(r.startTime, r.endTime)).join(', ');
+        warn.innerHTML = `⚠️ You already have a booking here on this date: <strong>${slots}</strong>. You can still book a different time slot.`;
+        warn.style.background = 'rgba(243,156,18,0.1)';
+        warn.style.borderColor = 'rgba(243,156,18,0.3)';
+        warn.style.color = '#d4680a';
+    }
+    warn.style.display = 'block';
+}
+
+function autoFillEndTime() {
+    const startInput = document.getElementById('requestStartTime');
+    const endInput   = document.getElementById('requestEndTime');
+    if (!startInput?.value || endInput?.value) return; // don't overwrite if already set
+    const [h, m] = startInput.value.split(':').map(Number);
+    const endMins = h * 60 + m + 60; // default +1 hour
+    const eh = String(Math.floor(endMins / 60) % 24).padStart(2, '0');
+    const em = String(endMins % 60).padStart(2, '0');
+    endInput.value = `${eh}:${em}`;
 }
 
 function closeRequestModal() {
@@ -44,27 +144,42 @@ function closeRequestModal() {
 }
 
 async function submitRequest() {
+    try {
     const session = getSession();
     if (!session) { showToast('Please log in again', 'error'); return; }
 
-    const requestedStatus = document.querySelector('input[name="requestStatus"]:checked').value;
+    const checkedRadio = document.querySelector('input[name="requestStatus"]:checked');
+    const requestedStatus = checkedRadio ? checkedRadio.value : 'locked';
     const date = document.getElementById('requestDate').value;
     const startTime = document.getElementById('requestStartTime').value;
     const endTime = document.getElementById('requestEndTime').value;
     const purpose = document.getElementById('requestPurpose').value.trim();
     const today = todayLocalString();
 
-    if (!date || !startTime || !endTime) { showToast('Please fill in all date and time fields.', 'error'); return; }
-    if (date < today) { showToast('Cannot request a room for a past date.', 'error'); return; }
+    const showFormError = (msg) => {
+        let el = document.getElementById('submitErrorMsg');
+        if (!el) {
+            el = document.createElement('div');
+            el.id = 'submitErrorMsg';
+            el.style.cssText = 'background:rgba(231,76,60,0.1);border:1px solid rgba(231,76,60,0.4);border-radius:8px;padding:10px 12px;font-size:12px;color:#c0392b;font-weight:600;margin-top:10px;';
+            const footer = document.querySelector('#requestModal .modal-footer');
+            if (footer) footer.parentNode.insertBefore(el, footer);
+        }
+        el.textContent = '⚠ ' + msg;
+        el.style.display = 'block';
+    };
+
+    if (!date || !startTime || !endTime) { showFormError('Please fill in all date and time fields.'); return; }
+    if (date < today) { showFormError('Cannot request a room for a past date.'); return; }
 
     if (date === today) {
         const nowTime = new Date();
         const [sh, sm] = startTime.split(':').map(Number);
         const startMinutes = sh * 60 + sm;
         const nowMinutes = nowTime.getHours() * 60 + nowTime.getMinutes();
-        if (startMinutes < nowMinutes) { showToast('Start time cannot be in the past.', 'error'); return; }
+        if (startMinutes < nowMinutes) { showFormError('Start time cannot be in the past.'); return; }
     }
-    if (startTime >= endTime) { showToast('End time must be after start time.', 'error'); return; }
+    if (startTime >= endTime) { showFormError('End time must be after start time — e.g. start 4:00 PM, end 5:00 PM.'); return; }
 
     // Check instructor already has overlapping request for same room
     const [newSh, newSm] = startTime.split(':').map(Number);
@@ -82,31 +197,119 @@ async function submitRequest() {
             return newStart < (ee * 60 + em3) && newEnd > (es * 60 + em2);
         })()
     );
-    if (conflict) { showToast(`You already have a request for Room ${selectedRoomForRequest} on ${date} at ${conflict.startTime}–${conflict.endTime}. Cancel that request first.`, 'error'); return; }
+    if (durationMins < 15) { showFormError('Minimum room usage is 15 minutes.'); return; }
+
+    if (conflict) {
+        const nowM2 = new Date().getHours() * 60 + new Date().getMinutes();
+        const [cs, cm] = (conflict.startTime || '').split(':').map(Number);
+        const [ce, cem] = (conflict.endTime || '').split(':').map(Number);
+        const isActiveNow = conflict.status === 'active' && date === today &&
+            nowM2 >= cs * 60 + cm && nowM2 < ce * 60 + cem;
+        const msg = isActiveNow
+            ? `You are currently using Room ${selectedRoomForRequest} (${fmt12Range(conflict.startTime, conflict.endTime)}). Cannot book the same room during your active session. Try after ${fmt12(conflict.endTime)}.`
+            : `Time conflict with your own booking (${fmt12Range(conflict.startTime, conflict.endTime)}). Choose a different time slot.`;
+        showFormError(msg); return;
+    }
 
     const [sh, sm2] = startTime.split(':').map(Number);
     const [eh, em] = endTime.split(':').map(Number);
     const durationMins = (eh * 60 + em) - (sh * 60 + sm2);
-    if (durationMins < 15) { showToast('Minimum room usage is 15 minutes.', 'error'); return; }
+    // Block if overlaps with another instructor's approved booking
+    const otherBlock = (roomRequests || []).find(r =>
+        (r.instructor || '').toLowerCase().trim() !== (session.username || '').toLowerCase().trim() &&
+        r.roomId === selectedRoomForRequest &&
+        r.date === date &&
+        ['pending','active','standby'].includes(r.status) &&
+        (() => {
+            const [es, em] = (r.startTime||'').split(':').map(Number);
+            const [ee, eem] = (r.endTime||'').split(':').map(Number);
+            return newStart < (ee*60+eem) && newEnd > (es*60+em);
+        })()
+    );
+    if (otherBlock) {
+        showFormError(`Room ${selectedRoomForRequest} already has a request from ${fmt12Range(otherBlock.startTime, otherBlock.endTime)}. Choose a non-overlapping time slot.`);
+        return;
+    }
+
+    const submitBtn = document.querySelector('#requestModal .btn-submit');
+    if (submitBtn) { submitBtn.textContent = 'Submitting...'; submitBtn.disabled = true; }
 
     try {
-        const result = await apiFetch('/api/requests', {
+        await apiFetch('/api/requests', {
             method: 'POST',
-            body: JSON.stringify({
-                roomId: selectedRoomForRequest,
-                date,
-                startTime,
-                endTime,
-                purpose,
-                requestedStatus
-            })
+            body: JSON.stringify({ roomId: selectedRoomForRequest, date, startTime, endTime, purpose, requestedStatus })
         });
-        await refreshData({ render: true });
-        showToast('Request submitted. Waiting for admin approval.', 'success');
-        closeRequestModal();
+
+        // Show success inside modal before closing
+        const body = document.querySelector('#requestModal .modal-body');
+        if (body) {
+            body.innerHTML = `
+                <div style="text-align:center;padding:32px 16px;">
+                    <div style="font-size:2.5rem;margin-bottom:12px;">✅</div>
+                    <div style="font-weight:700;font-size:1rem;margin-bottom:6px;">Request Submitted!</div>
+                    <div style="font-size:0.85rem;opacity:0.65;">Waiting for admin approval. Check the Requests tab for updates.</div>
+                </div>`;
+        }
+        const footer = document.querySelector('#requestModal .modal-footer');
+        if (footer) footer.style.display = 'none';
+
+        await refreshData({ render: true, force: true });
+        setTimeout(() => { closeRequestModal(); if (footer) footer.style.display = ''; }, 1800);
+
     } catch (error) {
-        showToast(error.message, 'error');
+        if (submitBtn) { submitBtn.textContent = 'Submit Request'; submitBtn.disabled = false; }
+        // Show error inside modal — visible regardless of z-index
+        const errMsg = error.message || 'Failed to submit request.';
+        let errEl = document.getElementById('submitErrorMsg');
+        if (!errEl) {
+            errEl = document.createElement('div');
+            errEl.id = 'submitErrorMsg';
+            errEl.style.cssText = 'background:rgba(231,76,60,0.1);border:1px solid rgba(231,76,60,0.4);border-radius:8px;padding:10px 12px;font-size:12px;color:#c0392b;font-weight:600;margin-top:10px;';
+            const footer = document.querySelector('#requestModal .modal-footer');
+            if (footer) footer.parentNode.insertBefore(errEl, footer);
+        }
+        errEl.textContent = '⚠ ' + errMsg;
+        errEl.style.display = 'block';
+        setTimeout(() => { if (errEl) errEl.style.display = 'none'; }, 6000);
     }
+    } catch (outerErr) {
+        console.error('submitRequest crashed:', outerErr);
+        showToast('Something went wrong: ' + outerErr.message, 'error');
+        const btn = document.querySelector('#requestModal .btn-submit');
+        if (btn) { btn.textContent = 'Submit Request'; btn.disabled = false; }
+    }
+}
+
+function _getDismissed() {
+    try { return JSON.parse(localStorage.getItem('ctu_dismissed_requests') || '{}'); } catch { return {}; }
+}
+function dismissRequest(id) {
+    const d = _getDismissed();
+    d[id] = true;
+    localStorage.setItem('ctu_dismissed_requests', JSON.stringify(d));
+    renderMyRequests();
+    renderMyHistory();
+}
+
+// Track which request statuses instructor has "seen"
+function _getSeenStatuses() {
+    try { return JSON.parse(localStorage.getItem('ctu_seen_statuses') || '{}'); } catch { return {}; }
+}
+function _markSeen(requestId) {
+    const s = _getSeenStatuses();
+    s[requestId] = true;
+    localStorage.setItem('ctu_seen_statuses', JSON.stringify(s));
+}
+function clearRequestsBadge() {
+    const badge = document.getElementById('requestBadge');
+    if (badge) badge.style.display = 'none';
+    // Mark all current requests as seen
+    const session = getSession();
+    if (!session) return;
+    const seen = _getSeenStatuses();
+    const u = (session.username || '').toLowerCase().trim();
+    (roomRequests || []).filter(r => (r.instructor || '').toLowerCase().trim() === u).forEach(r => { seen[r.id + '_' + r.status] = true; });
+    localStorage.setItem('ctu_seen_statuses', JSON.stringify(seen));
 }
 
 function renderMySchedules() {
@@ -148,9 +351,21 @@ function renderMySchedules() {
 
     mine.sort((a, b) => (a.date || '').localeCompare(b.date) || (a.startTime || '').localeCompare(b.startTime));
 
-    // Update badge
+    // Schedule badge: show count of active-RIGHT-NOW sessions
+    const today = new Date().toISOString().split('T')[0];
+    const nowM  = new Date().getHours() * 60 + new Date().getMinutes();
+    const activeNow = mine.filter(r => {
+        if (r.status !== 'active' || r.date !== today) return false;
+        const [sh, sm] = (r.startTime || '').split(':').map(Number);
+        const [eh, em] = (r.endTime   || '').split(':').map(Number);
+        return nowM >= sh * 60 + sm && nowM < eh * 60 + em;
+    }).length;
     const badge = document.getElementById('scheduleBadge');
-    if (badge) { badge.textContent = mine.length; badge.style.display = mine.length > 0 ? '' : 'none'; }
+    if (badge) {
+        badge.textContent = activeNow || mine.length;
+        badge.style.display = mine.length > 0 ? '' : 'none';
+        badge.style.background = activeNow > 0 ? '#27ae60' : '';
+    }
     const countEl = document.getElementById('myScheduleCount');
     if (countEl) countEl.textContent = mine.length;
 
@@ -211,7 +426,7 @@ function renderMySchedules() {
             </div>
             <div class="item-details">
                 <strong>Date:</strong> ${r.date === today ? '📅 Today' : r.date}<br>
-                <strong>Time:</strong> ${r.startTime} – ${r.endTime} ${duration ? `<span style="color:#888;">(${duration})</span>` : ''}<br>
+                <strong>Time:</strong> ${fmt12Range(r.startTime, r.endTime)} ${duration ? `<span style="color:#888;">(${duration})</span>` : ''}<br>
                 <strong>Purpose:</strong> ${escapeHtml(r.purpose || '—')}<br>
                 ${isStandby ? '<span style="color:#f39c12;font-size:12px;">You are in the queue — your booking activates when the current session ends.</span>' : ''}
             </div>
@@ -247,8 +462,13 @@ function renderMyRequests() {
     const session = getSession();
     if (!session || !list) return;
 
-    const myRequests = roomRequests
-        .filter(r => r.instructor === session.username && r.status === 'pending')
+    const myUsername = (session.username || '').toLowerCase().trim();
+    const dismissed = _getDismissed();
+    const myRequests = (roomRequests || [])
+        .filter(r =>
+            (r.instructor || '').toLowerCase().trim() === myUsername &&
+            (r.status === 'pending' || ((r.status === 'rejected' || r.status === 'cancelled') && !dismissed[r.id]))
+        )
         .sort((a, b) => new Date(b.requestedAt) - new Date(a.requestedAt));
 
     const emptyReq = document.getElementById('emptyRequestsState');
@@ -260,10 +480,14 @@ function renderMyRequests() {
     }
     if (emptyReq) emptyReq.style.display = 'none';
 
-    // Update badge
+    // Unseen: pending count + any status changed since last seen
+    const seen = _getSeenStatuses();
     const pending = myRequests.filter(r => r.status === 'pending').length;
+    const allMine = (roomRequests || []).filter(r => (r.instructor||'').toLowerCase().trim() === myUsername);
+    const unseenChanges = allMine.filter(r => !seen[r.id + '_' + r.status] && ['rejected','cancelled','active','standby'].includes(r.status)).length;
+    const totalUnseen = pending + unseenChanges;
     const badge = document.getElementById('requestBadge');
-    if (badge) { badge.textContent = pending; badge.style.display = pending > 0 ? '' : 'none'; }
+    if (badge) { badge.textContent = totalUnseen || ''; badge.style.display = totalUnseen > 0 ? '' : 'none'; }
     const countEl = document.getElementById('pendingRequestCount');
     if (countEl) countEl.textContent = pending;
 
@@ -293,7 +517,7 @@ function renderMyRequests() {
             </div>
             <div class="item-details">
                 <strong>Date:</strong> ${request.date}<br>
-                <strong>Time:</strong> ${request.startTime} – ${request.endTime}<br>
+                <strong>Time:</strong> ${fmt12Range(request.startTime, request.endTime)}<br>
                 <strong>Usage:</strong> ${request.requestedStatus || 'N/A'}<br>
                 <strong>Purpose:</strong> ${request.purpose || '—'}<br>
                 ${request.rejectionReason ? `<strong style="color:#e74c3c;">Reason:</strong> ${request.rejectionReason}<br>` : ''}
@@ -302,6 +526,10 @@ function renderMyRequests() {
             ${request.status === 'pending' ? `
                 <div class="item-actions">
                     <button class="btn-remove" onclick="removeRequest('${request.id}')">Cancel Request</button>
+                </div>
+            ` : ['rejected','cancelled'].includes(request.status) ? `
+                <div class="item-actions" style="padding-top:8px;border-top:1px solid var(--border,#eee);margin-top:8px;">
+                    <button class="btn-remove" style="font-size:12px;padding:6px 14px;" onclick="dismissRequest('${request.id}')">Dismiss → History</button>
                 </div>
             ` : ''}
         </div>
@@ -314,9 +542,17 @@ function renderMyHistory() {
     const session = getSession();
     if (!list || !session) return;
 
+    const dismissed = _getDismissed();
+    const myHistUser = (session.username || '').toLowerCase().trim();
     const myHistory = (roomRequests || [])
-        .filter(r => (r.instructor || '').toLowerCase().trim() === (session.username || '').toLowerCase().trim()
-            && ['completed','rejected','cancelled'].includes(r.status))
+        .filter(r => {
+            const sameUser = (r.instructor || '').toLowerCase().trim() === myHistUser;
+            if (!sameUser) return false;
+            if (r.status === 'completed') return true;
+            // rejected/cancelled: only show if dismissed
+            if ((r.status === 'rejected' || r.status === 'cancelled') && dismissed[r.id]) return true;
+            return false;
+        })
         .sort((a, b) => new Date(b.requestedAt) - new Date(a.requestedAt));
 
     if (myHistory.length === 0) {
@@ -342,7 +578,7 @@ function renderMyHistory() {
             </div>
             <div class="item-details">
                 <strong>Date:</strong> ${r.date}<br>
-                <strong>Time:</strong> ${r.startTime} – ${r.endTime} ${duration ? `<span style="opacity:0.6;">(${duration})</span>` : ''}<br>
+                <strong>Time:</strong> ${fmt12Range(r.startTime, r.endTime)} ${duration ? `<span style="opacity:0.6;">(${duration})</span>` : ''}<br>
                 <strong>Purpose:</strong> ${escapeHtml(r.purpose || '—')}<br>
                 ${r.rejectionReason ? `<strong style="color:#e74c3c;">Rejection Reason:</strong> ${escapeHtml(r.rejectionReason)}<br>` : ''}
             </div>
@@ -370,7 +606,7 @@ async function removeRequest(requestId) {
 
     try {
         await apiFetch(`/api/requests/${requestId}`, { method: 'DELETE' });
-        await refreshData({ render: true });
+        await refreshData({ render: true, force: true });
         showToast('Request removed successfully.', 'success');
     } catch (error) {
         showToast(error.message, 'error');

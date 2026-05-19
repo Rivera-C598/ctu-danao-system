@@ -45,6 +45,7 @@ function switchInstructorTab(tab) {
         document.getElementById('requestsTab').style.display = 'block';
         document.getElementById('navBtnRequests')?.classList.add('active');
         document.getElementById('menuBtnRequests')?.classList.add('active');
+        if (typeof clearRequestsBadge === 'function') clearRequestsBadge();
         renderMyRequests();
     } else if (tab === 'history') {
         document.getElementById('historyTab').style.display = 'block';
@@ -79,7 +80,7 @@ function renderRoomPickerList(query) {
     if (!list) return;
     const q = (query || '').toLowerCase().trim();
 
-    const rooms = allRooms.filter(r => r.type !== 'schedule' && r.isRequestable !== false);
+    const rooms = allRooms.filter(r => r.type !== 'schedule');
     const filtered = rooms.filter(r => {
         if (!q) return true;
         return r.id.toString() === q || r.category.toLowerCase().includes(q);
@@ -90,24 +91,56 @@ function renderRoomPickerList(query) {
         return;
     }
 
+    const today = new Date().toISOString().split('T')[0];
+
     list.innerHTML = filtered.map(room => {
         const statusColor = {
-            Available: 'var(--green,#27ae60)',
-            Locked: 'var(--red,#c0392b)',
-            Meeting: 'var(--purple,#7b3fa0)',
+            Available:   'var(--green,#27ae60)',
+            Locked:      'var(--red,#c0392b)',
+            Meeting:     'var(--purple,#7b3fa0)',
             Maintenance: 'var(--orange,#d4680a)'
         }[room.status] || '#999';
 
-        const queueCount = room.schedules?.length || 0;
+        // Booked slots today from room_schedules (active/standby)
+        const todaySlots = (room.schedules || [])
+            .filter(s => s.date === today)
+            .sort((a, b) => (a.startTime || '').localeCompare(b.startTime || ''));
+
+        // Also check pending requests for this room today (not yet approved but claimed)
+        const pendingSlots = (roomRequests || [])
+            .filter(r => r.roomId === room.id && r.date === today && r.status === 'pending')
+            .sort((a, b) => (a.startTime || '').localeCompare(b.startTime || ''));
+
+        const slotHTML = todaySlots.length === 0 && pendingSlots.length === 0
+            ? `<div style="font-size:11px;color:var(--green,#27ae60);margin-top:3px;">✓ No bookings today</div>`
+            : [
+                ...todaySlots.map(s => `<span style="display:inline-block;background:rgba(192,57,43,0.1);color:#c0392b;border-radius:4px;padding:1px 6px;font-size:10px;font-weight:600;margin:2px 2px 0 0;">${s.startTime}–${s.endTime}</span>`),
+                ...pendingSlots.map(s => `<span style="display:inline-block;background:rgba(243,156,18,0.1);color:#d4680a;border-radius:4px;padding:1px 6px;font-size:10px;font-weight:600;margin:2px 2px 0 0;">${s.startTime}–${s.endTime} ⏳</span>`)
+              ].join('');
+
+        const isBlocked = room.isRequestable === false;
+        const session = getSession();
+        const myUser = (session?.username || '').toLowerCase().trim();
+        const myTodaySlots = (roomRequests || []).filter(r =>
+            (r.instructor || '').toLowerCase().trim() === myUser &&
+            r.roomId === room.id && r.date === today &&
+            ['pending','active','standby'].includes(r.status)
+        );
+        const iMineAlready = myTodaySlots.length > 0;
 
         return `
-        <div onclick="event.stopPropagation();selectRoomFromPicker(${room.id})" style="display:flex;align-items:center;justify-content:space-between;padding:14px 4px;border-bottom:1px solid var(--border,#f0f0f0);cursor:pointer;gap:12px;">
-            <div>
-                <div style="font-weight:700;font-size:14px;">Room ${room.id}</div>
-                <div style="font-size:12px;color:#888;">${room.category}</div>
-                ${queueCount > 0 ? `<div style="font-size:11px;color:#f39c12;">${queueCount} in queue</div>` : ''}
+        <div onclick="${isBlocked ? '' : `event.stopPropagation();selectRoomFromPicker(${room.id})`}" style="padding:14px 4px;border-bottom:1px solid var(--border,#f0f0f0);cursor:${isBlocked ? 'default' : 'pointer'};opacity:${isBlocked ? '0.6' : '1'};${iMineAlready ? 'background:rgba(243,156,18,0.05);' : ''}">
+            <div style="display:flex;align-items:center;justify-content:space-between;gap:12px;margin-bottom:4px;">
+                <div>
+                    <span style="font-weight:700;font-size:14px;">Room ${room.id}</span>
+                    <span style="font-size:12px;color:#888;margin-left:6px;">${room.category}</span>
+                    ${iMineAlready ? '<span style="margin-left:6px;background:rgba(243,156,18,0.15);color:#d4680a;border-radius:4px;padding:1px 6px;font-size:10px;font-weight:700;">⚠ Your booking</span>' : ''}
+                </div>
+                ${isBlocked
+                    ? '<span style="background:#e74c3c;color:white;padding:3px 10px;border-radius:12px;font-size:11px;font-weight:700;white-space:nowrap;flex-shrink:0;">🚫 Blocked</span>'
+                    : `<span style="background:${statusColor};color:white;padding:3px 10px;border-radius:12px;font-size:11px;font-weight:700;white-space:nowrap;flex-shrink:0;">${room.status}</span>`}
             </div>
-            <span style="background:${statusColor};color:white;padding:4px 10px;border-radius:12px;font-size:11px;font-weight:700;white-space:nowrap;">${room.status}</span>
+            <div style="font-size:11px;color:#888;line-height:1.8;">${slotHTML}</div>
         </div>`;
     }).join('');
 }
