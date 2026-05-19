@@ -702,6 +702,29 @@ app.delete('/api/registration-codes/:id', requireAuth, requireRole('admin'), asy
     }
 });
 
+app.delete('/api/admin/users/:id', requireAuth, requireRole('admin'), async (req, res, next) => {
+    try {
+        if (req.params.id === req.user.id) return res.status(400).json({ error: 'Cannot delete your own account.' });
+        await requireDb().query('DELETE FROM users WHERE id = $1 AND role = $2', [req.params.id, 'instructor']);
+        res.json({ ok: true });
+    } catch (error) { next(error); }
+});
+
+app.delete('/api/auth/account', requireAuth, async (req, res, next) => {
+    try {
+        const { rows } = await requireDb().query('SELECT * FROM users WHERE id = $1', [req.user.id]);
+        const user = rows[0];
+        if (!user) return res.status(404).json({ error: 'User not found.' });
+        const pw = String(req.body.password || '');
+        if (!pw || !(await require('bcrypt').compare(pw, user.password_hash))) {
+            return res.status(401).json({ error: 'Incorrect password.' });
+        }
+        await requireDb().query('DELETE FROM users WHERE id = $1', [req.user.id]);
+        res.clearCookie('ctu_auth');
+        res.json({ ok: true });
+    } catch (error) { next(error); }
+});
+
 app.post('/api/admin/users/:id/reset-password', requireAuth, requireRole('admin'), async (req, res, next) => {
     try {
         const newPassword = String(req.body.newPassword || '');

@@ -171,6 +171,7 @@ function refreshUI() {
     if (typeof renderRegistrationCodes === 'function') renderRegistrationCodes();
     if (typeof checkAndAutoApproveQueue === 'function') checkAndAutoApproveQueue();
     if (typeof updateRequestsSidebar === 'function') updateRequestsSidebar();
+    if (typeof renderUsersView === 'function') renderUsersView();
 
     if (typeof renderInstructorAvailableRooms === 'function') renderInstructorAvailableRooms();
     if (typeof renderMySchedules === 'function') renderMySchedules();

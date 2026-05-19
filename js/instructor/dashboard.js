@@ -55,6 +55,25 @@ function renderSettingsTab() {
     if (msg) msg.style.display = 'none';
 }
 
+async function deleteMyAccount() {
+    const confirmed = await showConfirm(
+        'This permanently deletes your account and all your data. This cannot be undone.',
+        { title: 'Delete Account', confirmText: 'Delete My Account', confirmStyle: 'background:#e74c3c;color:white;' }
+    );
+    if (!confirmed) return;
+
+    const pw = await showPromptDialog('Enter your password to confirm:', { title: 'Confirm Deletion', placeholder: 'Your current password' });
+    if (!pw) return;
+
+    try {
+        await apiFetch('/api/auth/account', { method: 'DELETE', body: JSON.stringify({ password: pw }) });
+        clearSession();
+        window.location.href = '/html/Login.html';
+    } catch (err) {
+        showToast(err.message || 'Failed to delete account.', 'error');
+    }
+}
+
 async function saveSettingsPassword() {
     const current = document.getElementById('settingsCurrentPw')?.value;
     const newPw   = document.getElementById('settingsNewPw')?.value;

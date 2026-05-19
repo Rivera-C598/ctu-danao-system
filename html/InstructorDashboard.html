@@ -223,10 +223,13 @@
                     </div>
                 </div>
 
-                <!-- Logout -->
+                <!-- Logout + Delete -->
                 <div style="background:var(--surface,#fff);border-radius:16px;overflow:hidden;border:1px solid var(--border,#f0f0f0);">
-                    <button onclick="logout()" style="width:100%;padding:16px 18px;background:transparent;border:none;color:#e74c3c;font-weight:700;font-size:0.95rem;cursor:pointer;text-align:left;font-family:inherit;">
+                    <button onclick="logout()" style="width:100%;padding:15px 18px;background:transparent;border:none;border-bottom:1px solid var(--border,#f0f0f0);color:#e74c3c;font-weight:700;font-size:0.9rem;cursor:pointer;text-align:left;font-family:inherit;">
                         🚪 Logout
+                    </button>
+                    <button onclick="deleteMyAccount()" style="width:100%;padding:15px 18px;background:transparent;border:none;color:#95a5a6;font-weight:600;font-size:0.85rem;cursor:pointer;text-align:left;font-family:inherit;">
+                        🗑 Delete My Account
                     </button>
                 </div>
             </div>

@@ -824,10 +824,28 @@ function renderUsersTable() {
             <td>${u.email || '—'}</td>
             <td>${lastLogin}</td>
             <td><span style="font-weight:600;">${u.loginCount || 0}</span></td>
-            <td><button class="btn-outline-action" onclick="adminResetPassword('${u.id}', '${u.username}')">Reset Password</button></td>
+            <td style="display:flex;gap:6px;flex-wrap:wrap;">
+                <button class="btn-outline-action" onclick="adminResetPassword('${u.id}', '${u.username}')">Reset Password</button>
+                <button class="btn-danger-outline" style="font-size:0.78rem;padding:5px 10px;" onclick="adminDeleteUser('${u.id}', '${u.fullName||u.username}')">Delete</button>
+            </td>
         </tr>`;
     }).join('');
     renderPagination('usersPagination', totalUsers, usrPage, 'goUsersPage');
+}
+
+async function adminDeleteUser(userId, name) {
+    if (!await showConfirm(`Permanently delete account for "${name}"?\n\nThis removes their account and all associated data.`, {
+        title: 'Delete Instructor Account',
+        confirmText: 'Delete',
+        confirmStyle: 'background:#e74c3c;color:white;'
+    })) return;
+    try {
+        await apiFetch(`/api/admin/users/${userId}`, { method: 'DELETE' });
+        await refreshData({ render: true, force: true });
+        showNotification('Deleted', `Account for "${name}" has been removed.`, 'success', 3000);
+    } catch (error) {
+        showToast(error.message, 'error');
+    }
 }
 
 async function adminResetPassword(userId, username) {
