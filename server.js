@@ -316,6 +316,24 @@ async function buildSnapshot(user) {
     };
 }
 
+async function autoExpireOldRequests(db) {
+    const today = manilaToday();
+    const nowManila = new Intl.DateTimeFormat('en-CA', {
+        timeZone: 'Asia/Manila', hour: '2-digit', minute: '2-digit', hour12: false
+    }).format(new Date());
+
+    // Expire pending requests whose date/time has fully passed
+    await db.query(`
+        UPDATE room_requests
+        SET status = 'expired', decided_at = now()
+        WHERE status = 'pending'
+          AND (
+            date < $1
+            OR (date = $1 AND end_time < $2)
+          )
+    `, [today, nowManila]);
+}
+
 async function autoCompleteExpiredSessions(db) {
     const today = manilaToday();
     const nowManila = new Intl.DateTimeFormat('en-CA', {
@@ -966,6 +984,7 @@ if (require.main === module) {
     }
     if (pool) {
         setInterval(() => {
+            autoExpireOldRequests(pool).catch(() => {});
             autoCompleteExpiredSessions(pool).catch(() => {});
         }, 60 * 1000);
     }
